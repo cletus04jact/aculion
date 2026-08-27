@@ -856,20 +856,6 @@ export default function LiveDashboard({
                 <span className="font-mono">Today, {formattedDate}</span>
               </div>
 
-              <button className="px-3.5 py-2 bg-[#121829] border border-white/10 rounded-xl text-xs text-white/80 font-semibold flex items-center gap-2 hover:bg-white/5 transition-all cursor-pointer">
-                <i className="fa-solid fa-sliders text-xs text-blue-400" />
-                <span>Filter</span>
-              </button>
-
-              <div className="relative cursor-pointer">
-                <div className="w-10 h-10 rounded-xl bg-[#121829] border border-white/10 flex items-center justify-center text-white/80 hover:text-white">
-                  <i className="fa-solid fa-bell text-xs" />
-                </div>
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center border border-[#080c16]">
-                  {alerts.filter(a => a.active).length}
-                </span>
-              </div>
-
               <button
                 onClick={onAddNewMedia || onBackToProfile}
                 className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-500/20 border border-blue-400/30 transition-all flex items-center gap-1.5 cursor-pointer"

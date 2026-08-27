@@ -135,26 +135,169 @@ def _fingerprint(features: dict, kpis: dict, area_label: str = "") -> str:
 # Validation / guardrail layer
 # ---------------------------------------------------------------------------
 
-def _get_empty_recommendation() -> dict:
+def _get_empty_recommendation(features: dict = None, kpis: dict = None, area_label: str = "") -> dict:
+    if not features or not kpis:
+        return {
+            "best_advertising_domains": [],
+            "why_domains_fit": "",
+            "advantages_of_publishing": [],
+            "target_audience": [],
+            "area_strength_summary": "",
+            # Legacy back-compat fields
+            "ai_recommendation": "",
+            "top_advertising_categories": [],
+            "audience_segments": [],
+            "target_audience_legacy": "",
+            "why_fits": "",
+            "expected_customer_profile": "",
+            "best_performing_industries": [],
+            "shadow_glow": "",
+            "strengths": [],
+            "weaknesses": [],
+            "opportunities": [],
+            "limitations": [],
+            "suggested_campaigns": [],
+        }
+
+    # Deterministic fallback generator based on spatial stats
+    total_pois = features.get("total_pois", 0)
+    transit_accessibility = features.get("transit_accessibility", 0.0)
+    commercial_density = features.get("commercial_density", 0.0)
+    residential_density = features.get("residential_density", 0.0)
+    walkability = features.get("walkability", 0.0)
+
+    # Count specific POIs from category_counts
+    cat_counts = features.get("category_counts", {})
+    food_count = cat_counts.get("food_dining", 0)
+    shopping_count = cat_counts.get("shopping", 0)
+    office_count = cat_counts.get("office", 0) + cat_counts.get("commercial", 0)
+    bank_count = cat_counts.get("banking_finance", 0)
+    edu_count = cat_counts.get("education", 0)
+    health_count = cat_counts.get("healthcare", 0)
+
+    # Generate best advertising domains
+    domains = []
+    
+    # 1. Retail & FMCG (always a solid choice, score depends on POI counts)
+    retail_score = min(95.0, 50.0 + shopping_count * 5.0 + food_count * 2.0)
+    domains.append({
+        "category": "Retail & FMCG",
+        "score": retail_score,
+        "rationale": f"High density of local shopping ({shopping_count} POIs) and dining ({food_count} POIs) indicates active consumer retail footfall in {area_label or 'this area'}."
+    })
+
+    # 2. Food & Dining
+    food_score = min(95.0, 45.0 + food_count * 6.0)
+    domains.append({
+        "category": "Food & Dining",
+        "score": food_score,
+        "rationale": f"Supported by a strong presence of {food_count} dining and culinary establishments nearby, creating a natural audience for food/beverage promotions."
+    })
+
+    # 3. Banking & Finance (if banking/office presence)
+    if bank_count > 0 or office_count > 0:
+        fin_score = min(95.0, 40.0 + bank_count * 10.0 + office_count * 3.0)
+        domains.append({
+            "category": "Banking & Finance",
+            "score": fin_score,
+            "rationale": f"Driven by {bank_count} financial/banking locations and {office_count} commercial offices, attracting working professionals and business customers."
+        })
+
+    # 4. Education & Youth (if school/college presence)
+    if edu_count > 0:
+        edu_score = min(95.0, 45.0 + edu_count * 12.0)
+        domains.append({
+            "category": "Education & Student Services",
+            "score": edu_score,
+            "rationale": f"Directly targets students and academic staff visiting the {edu_count} educational institutions mapped in this zone."
+        })
+
+    # 5. Healthcare & Wellness
+    if health_count > 0:
+        health_score = min(95.0, 40.0 + health_count * 8.0)
+        domains.append({
+            "category": "Healthcare & Wellness",
+            "score": health_score,
+            "rationale": f"Caters to patients, visitors, and practitioners associated with the {health_count} healthcare facilities in the vicinity."
+        })
+
+    # Sort domains by score descending
+    domains.sort(key=lambda x: x["score"], reverse=True)
+    domains = domains[:3]  # keep top 3
+
+    # Why domains fit
+    why_fit_parts = []
+    if commercial_density >= 40:
+        why_fit_parts.append("its dense commercial fabric")
+    if transit_accessibility >= 50:
+        why_fit_parts.append("outstanding transit accessibility")
+    if total_pois > 10:
+        why_fit_parts.append(f"a highly active hub of {total_pois} local points of interest")
+    
+    area_name = area_label or "the selected location"
+    if why_fit_parts:
+        why_domains_fit = f"These advertising domains are selected for {area_name} due to " + ", ".join(why_fit_parts[:-1]) + (f" and {why_fit_parts[-1]}." if len(why_fit_parts) > 1 else f"{why_fit_parts[0]}.")
+    else:
+        why_domains_fit = f"These advertising domains match the general consumer traffic profile and road layout of {area_name}."
+
+    # Advantages of publishing
+    advantages = []
+    if transit_accessibility >= 50:
+        advantages.append("High commuter flow from transit/bus stops maximizes repeated ad impressions.")
+    if walkability >= 60:
+        advantages.append("Excellent pedestrian walkability increases billboard dwell time and viewability.")
+    if commercial_density >= 40:
+        advantages.append("Commercial cluster presence attracts high-spending daytime office workers.")
+    if total_pois >= 15:
+        advantages.append("Proximity to multiple retail/dining destinations captures intent-driven shoppers.")
+    if not advantages:
+        advantages.append("Strategically located to capture local neighborhood traffic and residents.")
+
+    # Target audience
+    audiences = []
+    if commercial_density >= 30:
+        audiences.append({
+            "segment": "Office Workers & Professionals",
+            "driven_by": f"{office_count} office and commercial locations nearby",
+            "relevance": "Caters to business professionals, commuters, and lunchtime visitors with higher disposable income."
+        })
+    if transit_accessibility >= 40:
+        audiences.append({
+            "segment": "Daily Commuters & Transit Riders",
+            "driven_by": f"Transit accessibility index of {transit_accessibility}/100",
+            "relevance": "High frequency of travel through bus/rail transit corridors ensures high ad recall and frequency."
+        })
+    if food_count > 0 or shopping_count > 0:
+        audiences.append({
+            "segment": "Shoppers & Diners",
+            "driven_by": f"{food_count} food and {shopping_count} shopping venues in the radius",
+            "relevance": "Captures active weekend and evening consumer traffic seeking dining and entertainment options."
+        })
+    if not audiences:
+        audiences.append({
+            "segment": "Local Residents & Pedestrians",
+            "driven_by": f"{total_pois} local community POIs",
+            "relevance": "Reaches the core neighborhood audience on daily routines and errand walks."
+        })
+
     return {
-        "best_advertising_domains": [],
-        "why_domains_fit": "",
-        "advantages_of_publishing": [],
-        "target_audience": [],
-        "area_strength_summary": "",
-        # Legacy back-compat fields
-        "ai_recommendation": "",
-        "top_advertising_categories": [],
-        "audience_segments": [],
-        "target_audience_legacy": "",
-        "why_fits": "",
-        "expected_customer_profile": "",
-        "best_performing_industries": [],
-        "strengths": [],
-        "weaknesses": [],
-        "opportunities": [],
-        "limitations": [],
-        "suggested_campaigns": [],
+        "best_advertising_domains": domains,
+        "why_domains_fit": why_domains_fit,
+        "advantages_of_publishing": advantages,
+        "target_audience": audiences,
+        "area_strength_summary": why_domains_fit,
+        "ai_recommendation": why_domains_fit,
+        "top_advertising_categories": [d["category"] for d in domains],
+        "audience_segments": [a["segment"] for a in audiences],
+        "target_audience_legacy": ", ".join(a["segment"] for a in audiences),
+        "why_fits": why_domains_fit,
+        "expected_customer_profile": ", ".join(a["segment"] for a in audiences),
+        "best_performing_industries": [d["category"] for d in domains],
+        "strengths": advantages,
+        "weaknesses": ["Competition for attention from nearby signs"] if total_pois > 20 else ["Lower raw traffic volume"],
+        "opportunities": ["Digital billboard placement at major intersections"],
+        "limitations": ["Physical space constraints for large installations"],
+        "suggested_campaigns": [f"Local promotion targeting {area_name} visitors"],
     }
 
 
@@ -315,14 +458,14 @@ def get_llm_recommendations(
     )
     if not has_data:
         logger.info("[llm_recommendation] No spatial data - returning empty recommendation template.")
-        return _get_empty_recommendation()
+        return _get_empty_recommendation(features, kpis, area_label)
 
     use_llm = os.environ.get("USE_LLM_RECOMMENDATIONS", "true").lower() == "true"
     model_name = os.environ.get("LLM_RECOMMENDATION_MODEL", "meta/llama-3.1-8b-instruct")
 
     if not use_llm:
         logger.info("[llm_recommendation] USE_LLM_RECOMMENDATIONS=false - recommendations disabled.")
-        return _get_empty_recommendation()
+        return _get_empty_recommendation(features, kpis, area_label)
 
     cache_key = _fingerprint(features, kpis, area_label)
     cached = _cache.get(cache_key)
@@ -478,4 +621,4 @@ def get_llm_recommendations(
     logger.warning(
         "[llm_recommendation] LLM call failed - returning default empty template."
     )
-    return _get_empty_recommendation()
+    return _get_empty_recommendation(features, kpis, area_label)

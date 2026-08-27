@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+
 // Reusing number animator from BrandPortal
 function AnimNum({ value, suffix = '', precision = 0 }) {
   const [display, setDisplay] = useState(0);
@@ -142,7 +144,7 @@ export default function AdminDashboard({ user, onLogout }) {
       const session = (await supabase.auth.getSession()).data.session;
       const token = session?.access_token;
       
-      const response = await fetch('http://localhost:8000/api/v1/admin/create-user', {
+      const response = await fetch(`${API_BASE_URL}/api/location/v1/admin/create-user`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

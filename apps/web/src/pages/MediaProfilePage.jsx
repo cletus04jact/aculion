@@ -3,6 +3,8 @@ import newLogo from '../assets/aculion_logo_transparent.png';
 import { billboardService } from '../services/billboard.service';
 import { supabase } from '../services/supabase';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+
 export default function MediaProfilePage({
   user,
   billboards,
@@ -162,7 +164,7 @@ export default function MediaProfilePage({
         const session = (await supabase.auth.getSession()).data.session;
         const token = session?.access_token;
 
-        const response = await fetch('http://localhost:8000/api/v1/admin/create-user', {
+        const response = await fetch(`${API_BASE_URL}/api/location/v1/admin/create-user`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -267,7 +269,7 @@ export default function MediaProfilePage({
       const token = session?.access_token;
 
       // 1. Create brand advertiser user on the backend
-      const response = await fetch('http://localhost:8000/api/v1/admin/create-user', {
+      const response = await fetch(`${API_BASE_URL}/api/location/v1/admin/create-user`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

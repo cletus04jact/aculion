@@ -33,7 +33,7 @@ export default function Dashboard({ selectedBillboard }: { selectedBillboard?: a
   const initialLng = selectedBillboard?.longitude ? Number(selectedBillboard.longitude) : 80.2707;
 
   // ── UI State ──
-  const [isMapPickingActive, setIsMapPickingActive] = useState(false);
+  const [isMapPickingActive, setIsMapPickingActive] = useState(true);
 
   // ── Candidate coordinate ──
   const [candidateLat, setCandidateLat] = useState(initialLat);
@@ -56,19 +56,7 @@ export default function Dashboard({ selectedBillboard }: { selectedBillboard?: a
     }
   }, [selectedBillboard]);
 
-  // ── Re-validate candidate coordinates when radius changes ──
-  useEffect(() => {
-    if (candidateLat !== latitude || candidateLng !== longitude) {
-      const distance = getDistanceMeters(latitude, longitude, candidateLat, candidateLng);
-      if (distance > radius) {
-        // Clear/reset pick back to the billboard center
-        setCandidateLat(latitude);
-        setCandidateLng(longitude);
-        setLatitude(latitude);
-        setLongitude(longitude);
-      }
-    }
-  }, [radius, latitude, longitude, candidateLat, candidateLng]);
+
 
   // ── Analytics query — refetches whenever latitude/longitude/radius changes ──
   const {
@@ -104,7 +92,6 @@ export default function Dashboard({ selectedBillboard }: { selectedBillboard?: a
   const handleLocationPicked = (lat: number, lng: number) => {
     setCandidateLat(lat);
     setCandidateLng(lng);
-    setIsMapPickingActive(false);
   };
 
   // ── Listen for chatbot analyze actions ──
@@ -139,7 +126,7 @@ export default function Dashboard({ selectedBillboard }: { selectedBillboard?: a
               <div className="absolute inset-0 bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
               
               <DotLottieReact
-                src="/Map_pin_location.lottie"
+                src="/Map pin location.lottie"
                 loop
                 autoplay
                 className="w-full h-full z-10"

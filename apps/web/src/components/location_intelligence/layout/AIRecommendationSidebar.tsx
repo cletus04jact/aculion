@@ -63,41 +63,6 @@ export default function AIRecommendationSidebar({
   return (
     <div className="w-full lg:w-[380px] lg:min-w-[380px] lg:max-w-[380px] border-t lg:border-t-0 lg:border-l border-border bg-card/20 p-6 flex flex-col space-y-6 lg:h-screen lg:overflow-y-auto text-foreground shrink-0">
       
-      {/* ── Selected Asset Box (Moved from Selected Asset section) ── */}
-      <div
-        style={{ backgroundColor: "#0050fc" }}
-        className="p-5 rounded-2xl border border-white/10 flex flex-col gap-4 text-foreground shadow-lg shrink-0"
-      >
-        <div>
-          <span className="text-[8.5px] font-extrabold uppercase tracking-widest text-white/70 block">Selected Asset</span>
-          <h2 className="text-sm font-extrabold text-white mt-1 truncate">
-            {analytics?.area || "Custom Coordinates"}
-          </h2>
-          <span className="text-[8px] font-mono text-blue-200/50 mt-0.5">
-            ID: CUSTOM
-          </span>
-        </div>
-
-        <div className="flex flex-col space-y-2.5 pt-2.5 border-t border-white/10">
-          <div className="flex items-center gap-2.5 text-xs">
-            <MapPin size={13} className="text-blue-300 shrink-0" />
-            <div>
-              <span className="text-[8px] font-bold text-blue-200/60 uppercase block">Candidate Coords</span>
-              <span className="font-mono text-white font-semibold text-[10px]">
-                {candidateLat.toFixed(5)}N, {candidateLng.toFixed(5)}E
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5 text-xs">
-            <Layers size={13} className="text-blue-300 shrink-0" />
-            <div>
-              <span className="text-[8px] font-bold text-blue-200/60 uppercase block">Analysis Radius</span>
-              <span className="font-mono text-white font-semibold text-[10px]">{radius}m</span>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* HEADER */}
       <div className="flex items-center gap-3 border-b border-border/40 pb-4">
