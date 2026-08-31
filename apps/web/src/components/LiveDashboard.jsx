@@ -232,12 +232,12 @@ export default function LiveDashboard({
       { id: 4, type: 'CRITICAL', title: 'Hardware sensor temperature alert (64°C)', target: `${selectedBillboard?.name || 'Edge Box'} Processor Unit`, time: '10:50 AM', active: true }
     ]);
 
-    async function fetchDbTrafficOverview() {
-      setIsTrafficLoading(true);
+    async function fetchDbTrafficOverview(isSilent = false) {
+      if (!isSilent) setIsTrafficLoading(true);
       if (!selectedBillboard?.billboard_code) {
         setDbTrafficData(null);
         localStorage.removeItem('aculion_traffic_overview');
-        setIsTrafficLoading(false);
+        if (!isSilent) setIsTrafficLoading(false);
         return;
       }
       try {
@@ -253,7 +253,7 @@ export default function LiveDashboard({
           console.error("[LiveDashboard] Error fetching traffic overview:", error);
           setDbTrafficData(null);
           localStorage.removeItem('aculion_traffic_overview');
-          setIsTrafficLoading(false);
+          if (!isSilent) setIsTrafficLoading(false);
           return;
         }
 
@@ -276,11 +276,19 @@ export default function LiveDashboard({
         setDbTrafficData(null);
         localStorage.removeItem('aculion_traffic_overview');
       } finally {
-        setIsTrafficLoading(false);
+        if (!isSilent) setIsTrafficLoading(false);
       }
     }
 
-    fetchDbTrafficOverview();
+    fetchDbTrafficOverview(false);
+
+    const intervalId = setInterval(() => {
+      fetchDbTrafficOverview(true);
+    }, 15000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
   }, [selectedBillboard]);
 
   // Data Export configurations

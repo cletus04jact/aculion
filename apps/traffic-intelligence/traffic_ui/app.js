@@ -1163,6 +1163,11 @@ document.addEventListener('DOMContentLoaded', () => {
     updateUIElements();
     initCctvSimulation();
     initClassifCamera();
+    
+    // Auto-refresh data and update charts/UI every 15 seconds
+    setInterval(() => {
+        fetchLatestData(state.filters.location);
+    }, 15000);
 
     // --- Live Simulated Realtime Integration ---
     let sseInterval = null;
