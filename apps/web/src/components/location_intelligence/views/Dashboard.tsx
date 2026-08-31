@@ -276,14 +276,12 @@ export default function Dashboard({ selectedBillboard }: { selectedBillboard?: a
           </main>
 
           {/* ── Right AI Recommendation Sidebar (Fixed 320px width) ── */}
-          <div className="w-full lg:w-[380px] lg:min-w-[380px] lg:max-w-[380px] shrink-0">
-            <AIRecommendationSidebar
-              analytics={analytics}
-              candidateLat={candidateLat}
-              candidateLng={candidateLng}
-              radius={radius}
-            />
-          </div>
+          <AIRecommendationSidebar
+            analytics={analytics}
+            candidateLat={candidateLat}
+            candidateLng={candidateLng}
+            radius={radius}
+          />
         </div>
       </div>
 

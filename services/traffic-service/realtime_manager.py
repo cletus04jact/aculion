@@ -1,20 +1,62 @@
 import asyncio
 import json
 import logging
+import random
 from typing import Set, Dict
 from datetime import datetime
-from supabase_client import supabase, SUPABASE_URL, SUPABASE_KEY
 
 logger = logging.getLogger("traffic-service.realtime")
+
+MOCK_CAMERAS = [
+    {"camera_code": "ACU-AN-001", "location_name": "Anna Nagar – Shanthi Colony Junction"},
+    {"camera_code": "ACU-TN-002", "location_name": "T Nagar – Usman Road Flyover"},
+    {"camera_code": "ACU-AM-003", "location_name": "Alwarpet – TTK Road Junction"},
+    {"camera_code": "ACU-LH-004", "location_name": "Little Mount – GST Road Crossing"}
+]
+
+def generate_mock_record(camera_code: str) -> dict:
+    location_name = "Anna Nagar – Shanthi Colony Junction"
+    for cam in MOCK_CAMERAS:
+        if cam["camera_code"] == camera_code:
+            location_name = cam["location_name"]
+            break
+            
+    total = random.randint(30, 120)
+    bikes = int(total * random.uniform(0.4, 0.6))
+    economy = int(total * random.uniform(0.2, 0.35))
+    premium = int(total * random.uniform(0.08, 0.15))
+    luxury = int(total * random.uniform(0.02, 0.06))
+    ultra_luxury = int(total * random.uniform(0.0, 0.02))
+    commercial = total - (bikes + economy + premium + luxury + ultra_luxury)
+    if commercial < 0:
+        commercial = 0
+        
+    return {
+        "id": f"mock-{camera_code}",
+        "location_name": location_name,
+        "camera_code": camera_code,
+        "total_vehicles": total,
+        "bikes": bikes,
+        "economy": economy,
+        "premium": premium,
+        "luxury": luxury,
+        "ultra_luxury": ultra_luxury,
+        "commercial": commercial,
+        "avg_exposure_time": round(random.uniform(5.0, 15.0), 1),
+        "max_exposure_time": round(random.uniform(20.0, 45.0), 1),
+        "estimated_reach": int(total * random.uniform(1.2, 1.8)),
+        "flow_rate": round(total / 60.0, 2),
+        "peak_traffic_hour": "08:00 AM - 09:30 AM",
+        "is_live": True,
+        "last_updated": datetime.utcnow()
+    }
 
 class RealtimeManager:
     def __init__(self):
         self.queues: Set[asyncio.Queue] = set()
         self.last_records: Dict[str, dict] = {}
         self.loop = None
-        self.channel = None
-        self.polling_task = None
-        self.realtime_task = None
+        self.simulator_task = None
         self.is_running = False
 
     def register(self, queue: asyncio.Queue):
@@ -29,7 +71,6 @@ class RealtimeManager:
         if not self.queues:
             return
         
-        # Convert any datetime or other non-serializable objects
         serialized_data = self._serialize_record(data)
         message = json.dumps(serialized_data)
         
@@ -49,120 +90,33 @@ class RealtimeManager:
                 serialized[k] = v
         return serialized
 
-    def _has_changed(self, old_rec: dict, new_rec: dict) -> bool:
-        if not old_rec:
-            return True
-        old_val = old_rec.get("last_updated") or old_rec.get("id")
-        new_val = new_rec.get("last_updated") or new_rec.get("id")
-        
-        if old_val != new_val:
-            return True
-            
-        return old_rec.get("total_vehicles") != new_rec.get("total_vehicles")
-
     async def start(self):
         self.is_running = True
         self.loop = asyncio.get_running_loop()
         
-        try:
-            from supabase import create_async_client
-            self.async_client = await create_async_client(SUPABASE_URL, SUPABASE_KEY)
-            logger.info("Supabase AsyncClient instantiated successfully.")
-        except Exception as e:
-            logger.error(f"Failed to instantiate Supabase AsyncClient: {e}")
-            self.async_client = None
-        
-        # Start DB polling fallback loop
-        self.polling_task = asyncio.create_task(self._db_polling_loop())
-        
-        # Start Supabase Realtime subscription task
-        self.realtime_task = asyncio.create_task(self._supabase_realtime_loop())
+        # Start DB simulator loop
+        self.simulator_task = asyncio.create_task(self._simulation_loop())
+        logger.info("RealtimeManager started with traffic simulator.")
 
     async def stop(self):
         self.is_running = False
-        if self.polling_task:
-            self.polling_task.cancel()
-        if self.realtime_task:
-            self.realtime_task.cancel()
-        if self.channel:
-            try:
-                self.channel.unsubscribe()
-            except Exception:
-                pass
+        if self.simulator_task:
+            self.simulator_task.cancel()
         logger.info("RealtimeManager stopped.")
 
-    async def _db_polling_loop(self):
-        logger.info("Starting database polling loop (fallback)...")
+    async def _simulation_loop(self):
+        logger.info("Starting simulated traffic updates loop...")
         while self.is_running:
             try:
-                response = supabase.table("traffic_master").select("*").execute()
-                records = response.data
-                if records:
-                    for record in records:
-                        camera_code = record.get("camera_code")
-                        if not camera_code:
-                            continue
-                        
-                        last_rec = self.last_records.get(camera_code)
-                        if self._has_changed(last_rec, record):
-                            logger.info(f"Database poll detected update for camera: {camera_code}")
-                            self.last_records[camera_code] = record
-                            self.broadcast(record)
+                for cam in MOCK_CAMERAS:
+                    camera_code = cam["camera_code"]
+                    record = generate_mock_record(camera_code)
+                    self.last_records[camera_code] = record
+                    self.broadcast(record)
             except Exception as e:
-                logger.error(f"Error in database polling loop: {e}")
+                logger.error(f"Error in simulation loop: {e}")
             
-            await asyncio.sleep(3.0)
-
-    async def _supabase_realtime_loop(self):
-        logger.info("Starting Supabase Realtime listener setup...")
-        while self.is_running:
-            try:
-                def on_change(payload):
-                    logger.info("Realtime event received from Supabase!")
-                    new_data = None
-                    try:
-                        if hasattr(payload, "new"):
-                            new_data = payload.new
-                        elif isinstance(payload, dict):
-                            new_data = payload.get("new") or payload.get("record")
-                        
-                        if not new_data:
-                            new_data = getattr(payload, "record", None)
-                            
-                        if not new_data and hasattr(payload, "get"):
-                            new_data = payload.get("new")
-                            
-                        if not new_data and isinstance(payload, str):
-                            new_data = json.loads(payload).get("new")
-
-                        if new_data:
-                            camera_code = new_data.get("camera_code")
-                            if camera_code:
-                                last_rec = self.last_records.get(camera_code)
-                                if self._has_changed(last_rec, new_data):
-                                    self.last_records[camera_code] = new_data
-                                    if self.loop:
-                                        self.loop.call_soon_threadsafe(self.broadcast, new_data)
-                    except Exception as ex:
-                        logger.error(f"Error processing realtime callback payload: {ex}")
-
-                if not self.async_client:
-                    raise ValueError("AsyncClient is not initialized")
-                self.channel = self.async_client.channel('traffic-changes')
-                self.channel.on_postgres_changes(
-                    event="*",
-                    schema="public",
-                    table="traffic_master",
-                    callback=on_change
-                )
-                await self.channel.subscribe()
-                
-                logger.info("Successfully subscribed to Supabase Realtime channel for traffic_master.")
-                
-                while self.is_running:
-                    await asyncio.sleep(10.0)
-            except Exception as e:
-                logger.error(f"Error in Supabase Realtime subscription: {e}. Reconnecting in 5 seconds...")
-                await asyncio.sleep(5.0)
+            # Broadcast simulated updates every 4 seconds
+            await asyncio.sleep(4.0)
 
 manager = RealtimeManager()

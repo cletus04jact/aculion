@@ -29,6 +29,17 @@ const CARD_BORDER_GLOWS = [
   "hover:border-amber-500/30 hover:shadow-amber-500/5"
 ];
 
+function sanitizeNumbers(text: string): string {
+  if (!text || typeof text !== "string") return text;
+  // Remove patterns like "(0 POIs)" or "(39 POIs)" or "(18 POI)"
+  let cleaned = text.replace(/\s*\(\s*\d+\s*POIs?\s*\)/gi, "");
+  // Remove standalone numbers or ranges/ratios (e.g. 40/100, 218, 0, 39, etc.)
+  cleaned = cleaned.replace(/\b\d+(?:\/\d+)?%?\b\s*/g, "");
+  // Clean up double spaces or trailing punctuation spaces
+  cleaned = cleaned.replace(/\s+/g, " ").trim();
+  return cleaned;
+}
+
 export default function AIRecommendationSidebar({
   analytics,
   candidateLat,
@@ -49,7 +60,7 @@ export default function AIRecommendationSidebar({
     target_audience: [
       {
         segment: "General Commuters & Residents",
-        driven_by: `${features?.total_pois || 0} local POIs, ${features?.bus_count || 0} transit stops`,
+        driven_by: "Local points of interest and transit stops",
         relevance: "General brand exposure across default commuter demographics."
       }
     ],
@@ -61,7 +72,7 @@ export default function AIRecommendationSidebar({
 
 
   return (
-    <div className="w-full lg:w-[380px] lg:min-w-[380px] lg:max-w-[380px] border-t lg:border-t-0 lg:border-l border-border bg-card/20 p-6 flex flex-col space-y-6 lg:h-screen lg:overflow-y-auto text-foreground shrink-0">
+    <div className="w-full lg:w-[380px] lg:min-w-[380px] lg:max-w-[380px] border-t lg:border-t-0 lg:border-l border-border bg-card/20 p-6 flex flex-col space-y-6 lg:h-auto lg:min-h-full text-foreground shrink-0">
       
 
       {/* HEADER */}
@@ -111,7 +122,7 @@ export default function AIRecommendationSidebar({
                   </div>
                   
                   <p className="text-[10.5px] text-muted-foreground leading-relaxed">
-                    {dom.rationale}
+                    {sanitizeNumbers(dom.rationale)}
                   </p>
                 </div>
               );
@@ -131,7 +142,7 @@ export default function AIRecommendationSidebar({
           <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground font-mono">Why These Domains Fit</h3>
         </div>
         <p className="text-[11px] text-muted-foreground leading-relaxed">
-          {llmRec.why_domains_fit}
+          {sanitizeNumbers(llmRec.why_domains_fit)}
         </p>
       </div>
 
@@ -146,7 +157,7 @@ export default function AIRecommendationSidebar({
             llmRec.advantages_of_publishing.map((adv, idx) => (
               <div key={idx} className="flex gap-2.5 text-[11px] leading-relaxed text-muted-foreground hover:text-foreground transition-colors group">
                 <CheckCircle2 size={13} className="text-emerald-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
-                <span>{adv}</span>
+                <span>{sanitizeNumbers(adv)}</span>
               </div>
             ))
           ) : (
@@ -173,12 +184,12 @@ export default function AIRecommendationSidebar({
                 </div>
                 
                 <p className="text-[10.5px] text-muted-foreground leading-relaxed">
-                  {aud.relevance}
+                  {sanitizeNumbers(aud.relevance)}
                 </p>
                 
                 <div className="pt-1.5 border-t border-border/20 flex items-center justify-between text-[9px] text-muted-foreground/80 font-medium">
                   <span>Driven by:</span>
-                  <span className="font-semibold text-primary/95">{aud.driven_by}</span>
+                  <span className="font-semibold text-primary/95">{sanitizeNumbers(aud.driven_by)}</span>
                 </div>
               </div>
             ))

@@ -183,7 +183,7 @@ def _get_empty_recommendation(features: dict = None, kpis: dict = None, area_lab
     domains.append({
         "category": "Retail & FMCG",
         "score": retail_score,
-        "rationale": f"High density of local shopping ({shopping_count} POIs) and dining ({food_count} POIs) indicates active consumer retail footfall in {area_label or 'this area'}."
+        "rationale": f"High density of local shopping and dining indicates active consumer retail footfall in {area_label or 'this area'}."
     })
 
     # 2. Food & Dining
@@ -191,7 +191,7 @@ def _get_empty_recommendation(features: dict = None, kpis: dict = None, area_lab
     domains.append({
         "category": "Food & Dining",
         "score": food_score,
-        "rationale": f"Supported by a strong presence of {food_count} dining and culinary establishments nearby, creating a natural audience for food/beverage promotions."
+        "rationale": f"Supported by a strong presence of dining and culinary establishments nearby, creating a natural audience for food/beverage promotions."
     })
 
     # 3. Banking & Finance (if banking/office presence)
@@ -200,7 +200,7 @@ def _get_empty_recommendation(features: dict = None, kpis: dict = None, area_lab
         domains.append({
             "category": "Banking & Finance",
             "score": fin_score,
-            "rationale": f"Driven by {bank_count} financial/banking locations and {office_count} commercial offices, attracting working professionals and business customers."
+            "rationale": f"Driven by financial/banking locations and commercial offices, attracting working professionals and business customers."
         })
 
     # 4. Education & Youth (if school/college presence)
@@ -209,7 +209,7 @@ def _get_empty_recommendation(features: dict = None, kpis: dict = None, area_lab
         domains.append({
             "category": "Education & Student Services",
             "score": edu_score,
-            "rationale": f"Directly targets students and academic staff visiting the {edu_count} educational institutions mapped in this zone."
+            "rationale": f"Directly targets students and academic staff visiting the educational institutions mapped in this zone."
         })
 
     # 5. Healthcare & Wellness
@@ -218,7 +218,7 @@ def _get_empty_recommendation(features: dict = None, kpis: dict = None, area_lab
         domains.append({
             "category": "Healthcare & Wellness",
             "score": health_score,
-            "rationale": f"Caters to patients, visitors, and practitioners associated with the {health_count} healthcare facilities in the vicinity."
+            "rationale": f"Caters to patients, visitors, and practitioners associated with the healthcare facilities in the vicinity."
         })
 
     # Sort domains by score descending
@@ -232,7 +232,7 @@ def _get_empty_recommendation(features: dict = None, kpis: dict = None, area_lab
     if transit_accessibility >= 50:
         why_fit_parts.append("outstanding transit accessibility")
     if total_pois > 10:
-        why_fit_parts.append(f"a highly active hub of {total_pois} local points of interest")
+        why_fit_parts.append(f"a highly active hub of local points of interest")
     
     area_name = area_label or "the selected location"
     if why_fit_parts:
@@ -258,25 +258,25 @@ def _get_empty_recommendation(features: dict = None, kpis: dict = None, area_lab
     if commercial_density >= 30:
         audiences.append({
             "segment": "Office Workers & Professionals",
-            "driven_by": f"{office_count} office and commercial locations nearby",
+            "driven_by": f"Office and commercial locations nearby",
             "relevance": "Caters to business professionals, commuters, and lunchtime visitors with higher disposable income."
         })
     if transit_accessibility >= 40:
         audiences.append({
             "segment": "Daily Commuters & Transit Riders",
-            "driven_by": f"Transit accessibility index of {transit_accessibility}/100",
-            "relevance": "High frequency of travel through bus/rail transit corridors ensures high ad recall and frequency."
+            "driven_by": f"Transit stops and corridors in the area",
+            "relevance": "High frequency of travel through bus/rail transit corridors ensures ad recall."
         })
     if food_count > 0 or shopping_count > 0:
         audiences.append({
             "segment": "Shoppers & Diners",
-            "driven_by": f"{food_count} food and {shopping_count} shopping venues in the radius",
+            "driven_by": f"Food and shopping venues in the vicinity",
             "relevance": "Captures active weekend and evening consumer traffic seeking dining and entertainment options."
         })
     if not audiences:
         audiences.append({
             "segment": "Local Residents & Pedestrians",
-            "driven_by": f"{total_pois} local community POIs",
+            "driven_by": f"Local community areas",
             "relevance": "Reaches the core neighborhood audience on daily routines and errand walks."
         })
 
@@ -300,6 +300,28 @@ def _get_empty_recommendation(features: dict = None, kpis: dict = None, area_lab
         "suggested_campaigns": [f"Local promotion targeting {area_name} visitors"],
     }
 
+
+import re
+
+def _sanitize_numbers(text: str) -> str:
+    if not isinstance(text, str):
+        return text
+    # Remove patterns like "(0 POIs)" or "(39 POIs)" or "(18 POI)"
+    text = re.sub(r'\s*\(\s*\d+\s*POIs?\s*\)', '', text, flags=re.IGNORECASE)
+    # Remove standalone numbers or ranges/ratios (e.g. 40/100, 218, 0, 39, etc.)
+    text = re.sub(r'\b\d+(?:/\d+)?%?\b\s*', '', text)
+    # Clean up double spaces or trailing punctuation spaces
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+def _sanitize_all_strings(val):
+    if isinstance(val, dict):
+        return {k: _sanitize_all_strings(v) for k, v in val.items()}
+    elif isinstance(val, list):
+        return [_sanitize_all_strings(v) for v in val]
+    elif isinstance(val, str):
+        return _sanitize_numbers(val)
+    return val
 
 def _validate_and_clean(raw_json: dict) -> dict:
     """Enforce schema and provide fallback empty structures for missing fields."""
@@ -380,7 +402,8 @@ def _validate_and_clean(raw_json: dict) -> dict:
     cleaned["best_performing_industries"] = [d["category"] for d in cleaned["best_advertising_domains"]]
     cleaned["strengths"] = cleaned["advantages_of_publishing"]
 
-    return cleaned
+    # Post-process to guarantee that no numbers/counts leak into generated text fields
+    return _sanitize_all_strings(cleaned)
 
 
 SYSTEM_PROMPT = """You are a senior location-intelligence and marketing analyst for an out-of-home (OOH) digital advertising platform operating in any city or region.
@@ -417,7 +440,7 @@ Your response must be a valid JSON object matching the schema below:
     {
       "category": "Ad category/domain name (e.g. Real Estate, Banking & Finance, Healthcare, Education, Fashion, Food & Dining, Retail, Automotive, etc.)",
       "score": 85,
-      "rationale": "Why this domain is relevant based on the POI composition and surrounding activity (e.g., 'With 5 commercial offices and 3 IT parks nearby, banking products fit working professionals')."
+      "rationale": "Why this domain is relevant based on the POI composition and surrounding activity (e.g., 'With commercial offices and IT parks nearby, banking products fit working professionals')."
     }
   ],
   "why_domains_fit": "A paragraph explaining why these advertising domains are relevant based on the POI composition and surrounding activity.",
@@ -427,7 +450,7 @@ Your response must be a valid JSON object matching the schema below:
   "target_audience": [
     {
       "segment": "Likely audience segment (e.g., Working professionals, Families, Students, Shoppers, Fitness-conscious users, Travelers, High-income residents, Daily commuters)",
-      "driven_by": "The specific POI types/counts from the data that imply this segment (e.g., 'Driven by 4 colleges and 2 libraries')",
+      "driven_by": "The specific POI types/counts from the data that imply this segment (e.g., 'Driven by colleges and libraries')",
       "relevance": "Why they are relevant to advertisers at this location."
     }
   ],
@@ -437,6 +460,7 @@ Your response must be a valid JSON object matching the schema below:
 CRITICAL RULES:
 1. Do not use markdown code fences, do not include preamble, do not include trailing commentary. Output ONLY the JSON block.
 2. Ground all recommendations and segment analysis in the actual POI counts/densities, landuse, and transit access metrics provided. If there is low POI density or sparse data, report it realistically.
+3. DO NOT output any specific numbers or digits (such as exact counts, percentages, ratios, or frequencies) in any of the natural language text fields of your output (e.g., in `rationale`, `why_domains_fit`, `driven_by`, `relevance`, `advantages_of_publishing`, or `area_strength_summary`). Use qualitative language instead (such as "strong presence", "highly accessible", "frequent", "numerous", "limited", "minimal"). Keep all text descriptions completely free of numeric digits.
 """
 
 

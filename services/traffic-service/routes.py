@@ -4,8 +4,7 @@ import logging
 from typing import List, Optional
 from fastapi import APIRouter, Request, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from supabase_client import supabase
-from realtime_manager import manager
+from realtime_manager import manager, MOCK_CAMERAS, generate_mock_record
 import schemas
 
 logger = logging.getLogger("traffic-service.routes")
@@ -21,43 +20,17 @@ def health_check():
 
 @router.get("/traffic/cameras", response_model=List[schemas.CameraInfo])
 def get_cameras():
-    try:
-        response = supabase.table("traffic_master").select("camera_code, location_name").execute()
-        records = response.data
-        if not records:
-            return []
-        # De-duplicate cameras by camera_code
-        seen = set()
-        cameras = []
-        for r in records:
-            cc = r.get("camera_code")
-            if cc and cc not in seen:
-                seen.add(cc)
-                cameras.append({
-                    "camera_code": cc,
-                    "location_name": r.get("location_name") or cc
-                })
-        return cameras
-    except Exception as e:
-        logger.error(f"Error fetching cameras: {e}")
-        return []
+    return MOCK_CAMERAS
 
 @router.get("/traffic/latest", response_model=schemas.TrafficRecord)
 def get_latest_traffic(camera_code: str = Query(..., description="Camera code to filter by")):
     try:
-        response = supabase.table("traffic_master")\
-            .select("*")\
-            .eq("camera_code", camera_code)\
-            .order("last_updated", desc=True)\
-            .limit(1)\
-            .execute()
-        
-        records = response.data
-        if not records:
-            raise HTTPException(status_code=404, detail=f"No traffic record found for camera {camera_code}")
-        return records[0]
-    except HTTPException:
-        raise
+        # Check if we have a simulated record in memory
+        record = manager.last_records.get(camera_code)
+        if not record:
+            record = generate_mock_record(camera_code)
+            manager.last_records[camera_code] = record
+        return record
     except Exception as e:
         logger.error(f"Error fetching latest traffic for {camera_code}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -72,17 +45,12 @@ async def traffic_stream(request: Request, camera_code: Optional[str] = Query(No
             # Yield initial snapshot if camera_code is specified
             if camera_code:
                 try:
-                    response = supabase.table("traffic_master")\
-                        .select("*")\
-                        .eq("camera_code", camera_code)\
-                        .order("last_updated", desc=True)\
-                        .limit(1)\
-                        .execute()
-                    
-                    if response.data:
-                        initial_rec = response.data[0]
-                        serialized = manager._serialize_record(initial_rec)
-                        yield f"data: {json.dumps(serialized)}\n\n"
+                    record = manager.last_records.get(camera_code)
+                    if not record:
+                        record = generate_mock_record(camera_code)
+                        manager.last_records[camera_code] = record
+                    serialized = manager._serialize_record(record)
+                    yield f"data: {json.dumps(serialized)}\n\n"
                 except Exception as ex:
                     logger.error(f"Error fetching initial record for stream: {ex}")
             
