@@ -67,8 +67,34 @@ export default function MediaProfilePage({
   const [brandFormError, setBrandFormError] = useState('');
   const [registeredOwners, setRegisteredOwners] = useState([]);
 
+  const isAdmin = user?.role === 'Administrator';
+
+  // Contact Aculion Team Modal state (for billboard owners and brand owners)
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [contactSubmitting, setContactSubmitting] = useState(false);
+  const [contactSubmitted, setContactSubmitted] = useState(false);
+  const [contactFormData, setContactFormData] = useState({
+    name: user?.name || '',
+    email: user?.email || '',
+    phone: user?.phone || '',
+    location: '',
+    billboardType: 'Digital Billboard',
+    dimensions: '40 ft × 20 ft',
+    notes: ''
+  });
+
+  const handleContactSubmit = (e) => {
+    e.preventDefault();
+    setContactSubmitting(true);
+    setTimeout(() => {
+      setContactSubmitting(false);
+      setContactSubmitted(true);
+      showToast('contact', 'Aculion Onboarding Team');
+    }, 500);
+  };
+
   // Toast notification state
-  const [toast, setToast] = useState(null); // { type: 'billboard'|'brand', name: string }
+  const [toast, setToast] = useState(null); // { type: 'billboard'|'brand'|'contact', name: string }
   const toastTimerRef = React.useRef(null);
 
   const showToast = (type, name) => {
@@ -402,7 +428,11 @@ export default function MediaProfilePage({
               flexShrink: 0
             }}>
               <i
-                className={toast.type === 'brand' ? 'fa-solid fa-briefcase' : 'fa-solid fa-tower-cell'}
+                className={
+                  toast.type === 'brand' ? 'fa-solid fa-briefcase' :
+                  toast.type === 'contact' ? 'fa-solid fa-headset' :
+                  'fa-solid fa-tower-cell'
+                }
                 style={{ color: '#00f050', fontSize: '16px' }}
               />
             </div>
@@ -412,15 +442,21 @@ export default function MediaProfilePage({
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                 <i className="fa-solid fa-circle-check" style={{ color: '#00f050', fontSize: '12px' }} />
                 <span style={{ fontSize: '11px', fontWeight: 700, color: '#00f050', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                  {toast.type === 'brand' ? 'Brand Saved' : 'Billboard Saved'}
+                  {toast.type === 'brand' ? 'Brand Saved' : toast.type === 'contact' ? 'Request Sent' : 'Billboard Saved'}
                 </span>
               </div>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                <span style={{ color: 'rgba(255,255,255,0.55)', fontWeight: 400 }}>"</span>
-                {toast.name}
-                <span style={{ color: 'rgba(255,255,255,0.55)', fontWeight: 400 }}>"</span>
-                {' '}details saved successfully.
-              </div>
+              {toast.type === 'contact' ? (
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  Onboarding request sent to Aculion Team.
+                </div>
+              ) : (
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.55)', fontWeight: 400 }}>"</span>
+                  {toast.name}
+                  <span style={{ color: 'rgba(255,255,255,0.55)', fontWeight: 400 }}>"</span>
+                  {' '}details saved successfully.
+                </div>
+              )}
             </div>
 
             {/* Progress bar */}
@@ -752,13 +788,23 @@ export default function MediaProfilePage({
                     {filteredBillboards.length} Items
                   </span>
                 </div>
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 cursor-pointer"
-                >
-                  <i className="fa-solid fa-plus text-[10px]" />
-                  <span>Add Billboard</span>
-                </button>
+                {isAdmin ? (
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    <i className="fa-solid fa-plus text-[10px]" />
+                    <span>Add Billboard</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { setShowContactModal(true); setContactSubmitted(false); }}
+                    className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1.5 cursor-pointer bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 px-3 py-1.5 rounded-xl transition-all"
+                  >
+                    <i className="fa-solid fa-headset text-xs" />
+                    <span>Contact Aculion to Add Billboard</span>
+                  </button>
+                )}
               </div>
 
               {/* Billboard Cards Grid */}
@@ -829,23 +875,46 @@ export default function MediaProfilePage({
                   </div>
                 ))}
 
-                {/* '+' Billboard Option Card */}
-                <div
-                  onClick={() => setShowAddModal(true)}
-                  className="group bg-[#0e1424]/40 hover:bg-[#0e1424]/80 border-2 border-dashed border-blue-500/30 hover:border-blue-500/60 rounded-2xl p-6 transition-all duration-300 flex flex-col items-center justify-center gap-4 min-h-[300px] cursor-pointer text-center relative overflow-hidden shadow-lg hover:shadow-blue-500/10"
-                >
-                  <div className="w-14 h-14 rounded-full bg-blue-500/10 border border-blue-500/30 group-hover:border-cyan-400 group-hover:bg-blue-500/20 group-hover:scale-110 flex items-center justify-center text-cyan-400 text-2xl transition-all duration-300">
-                    <i className="fa-solid fa-plus" />
+                {/* Role-based Billboard Card Action */}
+                {isAdmin ? (
+                  <div
+                    onClick={() => setShowAddModal(true)}
+                    className="group bg-[#0e1424]/40 hover:bg-[#0e1424]/80 border-2 border-dashed border-blue-500/30 hover:border-blue-500/60 rounded-2xl p-6 transition-all duration-300 flex flex-col items-center justify-center gap-4 min-h-[300px] cursor-pointer text-center relative overflow-hidden shadow-lg hover:shadow-blue-500/10"
+                  >
+                    <div className="w-14 h-14 rounded-full bg-blue-500/10 border border-blue-500/30 group-hover:border-cyan-400 group-hover:bg-blue-500/20 group-hover:scale-110 flex items-center justify-center text-cyan-400 text-2xl transition-all duration-300">
+                      <i className="fa-solid fa-plus" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <h3 className="text-base font-bold text-white group-hover:text-cyan-400 transition-colors font-heading">
+                        + Add Billboard
+                      </h3>
+                      <p className="text-xs text-white/40 max-w-[200px]">
+                        Register another billboard location asset into admin platform.
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <h3 className="text-base font-bold text-white group-hover:text-cyan-400 transition-colors font-heading">
-                      + Add Billboard
-                    </h3>
-                    <p className="text-xs text-white/40 max-w-[200px]">
-                      Register another billboard location asset into admin platform.
-                    </p>
+                ) : (
+                  <div
+                    onClick={() => { setShowContactModal(true); setContactSubmitted(false); }}
+                    className="group bg-[#0e1424]/40 hover:bg-[#0e1424]/80 border-2 border-dashed border-cyan-500/30 hover:border-cyan-400/60 rounded-2xl p-6 transition-all duration-300 flex flex-col items-center justify-center gap-4 min-h-[300px] cursor-pointer text-center relative overflow-hidden shadow-lg hover:shadow-cyan-500/10"
+                  >
+                    <div className="w-14 h-14 rounded-full bg-cyan-500/10 border border-cyan-500/30 group-hover:border-cyan-400 group-hover:bg-cyan-500/20 group-hover:scale-110 flex items-center justify-center text-cyan-400 text-2xl transition-all duration-300 shadow-md shadow-cyan-500/10">
+                      <i className="fa-solid fa-headset" />
+                    </div>
+                    <div className="flex flex-col gap-2 max-w-[240px]">
+                      <h3 className="text-base font-bold text-white group-hover:text-cyan-400 transition-colors font-heading">
+                        Add New Billboard
+                      </h3>
+                      <p className="text-xs text-white/50 leading-relaxed">
+                        To add a billboard to your network, please <span className="text-cyan-300 font-semibold">contact the Aculion team</span> for onboarding & sensor setup.
+                      </p>
+                      <div className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-cyan-400 group-hover:text-cyan-300 mt-1">
+                        <span>Contact Aculion Team</span>
+                        <i className="fa-solid fa-arrow-right text-[10px] group-hover:translate-x-1 transition-transform" />
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           )}
@@ -861,13 +930,23 @@ export default function MediaProfilePage({
                     {filteredBrands.length} Brands
                   </span>
                 </div>
-                <button
-                  onClick={() => setShowAddBrandModal(true)}
-                  className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 cursor-pointer"
-                >
-                  <i className="fa-solid fa-plus text-[10px]" />
-                  <span>Add Brand</span>
-                </button>
+                {isAdmin ? (
+                  <button
+                    onClick={() => setShowAddBrandModal(true)}
+                    className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    <i className="fa-solid fa-plus text-[10px]" />
+                    <span>Add Brand</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { setShowContactModal(true); setContactSubmitted(false); }}
+                    className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1.5 cursor-pointer bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 px-3 py-1.5 rounded-xl transition-all"
+                  >
+                    <i className="fa-solid fa-headset text-xs" />
+                    <span>Contact Aculion Team</span>
+                  </button>
+                )}
               </div>
 
               {/* Brand Cards Grid */}
@@ -917,23 +996,46 @@ export default function MediaProfilePage({
                   </div>
                 ))}
 
-                {/* '+' Brand Option Card */}
-                <div
-                  onClick={() => setShowAddBrandModal(true)}
-                  className="group bg-[#0e1424]/40 hover:bg-[#0e1424]/80 border-2 border-dashed border-cyan-500/30 hover:border-cyan-500/60 rounded-2xl p-6 transition-all duration-300 flex flex-col items-center justify-center gap-4 min-h-[220px] cursor-pointer text-center relative overflow-hidden shadow-lg hover:shadow-cyan-500/10"
-                >
-                  <div className="w-14 h-14 rounded-full bg-cyan-500/10 border border-cyan-500/30 group-hover:border-cyan-400 group-hover:bg-cyan-500/20 group-hover:scale-110 flex items-center justify-center text-cyan-400 text-2xl transition-all duration-300">
-                    <i className="fa-solid fa-plus" />
+                {/* Role-based Brand Card Action */}
+                {isAdmin ? (
+                  <div
+                    onClick={() => setShowAddBrandModal(true)}
+                    className="group bg-[#0e1424]/40 hover:bg-[#0e1424]/80 border-2 border-dashed border-cyan-500/30 hover:border-cyan-500/60 rounded-2xl p-6 transition-all duration-300 flex flex-col items-center justify-center gap-4 min-h-[220px] cursor-pointer text-center relative overflow-hidden shadow-lg hover:shadow-cyan-500/10"
+                  >
+                    <div className="w-14 h-14 rounded-full bg-cyan-500/10 border border-cyan-500/30 group-hover:border-cyan-400 group-hover:bg-cyan-500/20 group-hover:scale-110 flex items-center justify-center text-cyan-400 text-2xl transition-all duration-300">
+                      <i className="fa-solid fa-plus" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <h3 className="text-base font-bold text-white group-hover:text-cyan-300 transition-colors font-heading">
+                        + Add Brand
+                      </h3>
+                      <p className="text-xs text-white/40 max-w-[200px]">
+                        Create another brand advertiser profile to assign campaign billboards.
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <h3 className="text-base font-bold text-white group-hover:text-cyan-300 transition-colors font-heading">
-                      + Add Brand
-                    </h3>
-                    <p className="text-xs text-white/40 max-w-[200px]">
-                      Create another brand advertiser profile to assign campaign billboards.
-                    </p>
+                ) : (
+                  <div
+                    onClick={() => { setShowContactModal(true); setContactSubmitted(false); }}
+                    className="group bg-[#0e1424]/40 hover:bg-[#0e1424]/80 border-2 border-dashed border-cyan-500/30 hover:border-cyan-400/60 rounded-2xl p-6 transition-all duration-300 flex flex-col items-center justify-center gap-4 min-h-[220px] cursor-pointer text-center relative overflow-hidden shadow-lg hover:shadow-cyan-500/10"
+                  >
+                    <div className="w-14 h-14 rounded-full bg-cyan-500/10 border border-cyan-500/30 group-hover:border-cyan-400 group-hover:bg-cyan-500/20 group-hover:scale-110 flex items-center justify-center text-cyan-400 text-2xl transition-all duration-300 shadow-md shadow-cyan-500/10">
+                      <i className="fa-solid fa-headset" />
+                    </div>
+                    <div className="flex flex-col gap-2 max-w-[240px]">
+                      <h3 className="text-base font-bold text-white group-hover:text-cyan-300 transition-colors font-heading">
+                        Add Brand Partner
+                      </h3>
+                      <p className="text-xs text-white/50 leading-relaxed">
+                        To onboard a brand advertiser, please <span className="text-cyan-300 font-semibold">contact the Aculion team</span> for campaign slot allocation.
+                      </p>
+                      <div className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-cyan-400 group-hover:text-cyan-300 mt-1">
+                        <span>Contact Aculion Team</span>
+                        <i className="fa-solid fa-arrow-right text-[10px] group-hover:translate-x-1 transition-transform" />
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           )}
@@ -941,8 +1043,8 @@ export default function MediaProfilePage({
         </section>
       </main>
 
-      {/* ── MODAL 1: ADD NEW BILLBOARD ── */}
-      {showAddModal && (
+      {/* ── MODAL 1: ADD NEW BILLBOARD (ADMIN ONLY) ── */}
+      {showAddModal && isAdmin && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-6 overflow-hidden">
           <div className="bg-[#0e1424] border border-blue-500/30 rounded-2xl max-w-2xl w-full max-h-[85vh] sm:max-h-[90vh] shadow-2xl relative flex flex-col overflow-hidden my-auto">
             
@@ -1299,8 +1401,8 @@ export default function MediaProfilePage({
         </div>
       )}
 
-      {/* ── MODAL 2: ADD NEW BRAND ── */}
-      {showAddBrandModal && (
+      {/* ── MODAL 2: ADD NEW BRAND (ADMIN ONLY) ── */}
+      {showAddBrandModal && isAdmin && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-6 overflow-hidden">
           <div className="bg-[#0e1424] border border-cyan-500/30 rounded-2xl max-w-xl w-full max-h-[85vh] sm:max-h-[90vh] shadow-2xl relative flex flex-col overflow-hidden my-auto">
             
@@ -1465,6 +1567,222 @@ export default function MediaProfilePage({
                 </button>
               </div>
             </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL 3: CONTACT ACULION TEAM (FOR BILLBOARD / BRAND OWNERS) ── */}
+      {showContactModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-6 overflow-hidden">
+          <div className="bg-[#0e1424] border border-cyan-500/30 rounded-2xl max-w-xl w-full max-h-[90vh] shadow-2xl relative flex flex-col overflow-hidden my-auto">
+            
+            {/* FIXED HEADER */}
+            <div className="p-5 sm:p-6 border-b border-white/10 flex-shrink-0 flex items-center justify-between bg-[#0e1424] z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 text-lg shadow-lg shadow-cyan-500/10">
+                  <i className="fa-solid fa-headset" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold font-heading text-white">Contact Aculion Team</h3>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-semibold uppercase tracking-wider">
+                      Partner Desk
+                    </span>
+                  </div>
+                  <p className="text-xs text-white/50 mt-0.5">Media asset onboarding & hardware telemetry provisioning</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setShowContactModal(false); setContactSubmitted(false); }}
+                className="text-white/40 hover:text-white text-lg transition-colors p-1 cursor-pointer"
+                aria-label="Close modal"
+              >
+                <i className="fa-solid fa-xmark" />
+              </button>
+            </div>
+
+            {/* SCROLLABLE BODY */}
+            <div className="p-5 sm:p-6 overflow-y-auto flex-1 flex flex-col gap-5">
+              
+              {/* Informative notice card */}
+              <div className="bg-gradient-to-r from-blue-900/30 to-cyan-900/20 border border-cyan-500/30 rounded-xl p-4 flex items-start gap-3.5">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-300 text-sm flex-shrink-0 mt-0.5">
+                  <i className="fa-solid fa-tower-broadcast" />
+                </div>
+                <div className="flex flex-col gap-1 text-xs">
+                  <span className="font-bold text-cyan-300 uppercase tracking-wider text-[11px]">Billboard Onboarding Notice</span>
+                  <p className="text-white/70 leading-relaxed">
+                    To maintain real-time vehicle telemetry, camera exposure stats, and PostGIS verification, all new billboard installations are provisioned directly by the Aculion engineering team.
+                  </p>
+                </div>
+              </div>
+
+              {/* Direct Contact Channels Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="bg-[#12192e]/90 border border-white/10 hover:border-cyan-500/40 rounded-xl p-3.5 flex flex-col gap-2 transition-all">
+                  <div className="flex items-center gap-2.5 text-cyan-400">
+                    <i className="fa-solid fa-envelope text-sm" />
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-white/60">Email Support</span>
+                  </div>
+                  <a
+                    href={`mailto:contact@aculion.com?subject=Billboard%20Onboarding%20Request%20-%20${encodeURIComponent(user?.name || 'Partner')}`}
+                    className="text-xs font-mono font-bold text-white hover:text-cyan-300 transition-colors truncate"
+                  >
+                    contact@aculion.com
+                  </a>
+                  <span className="text-[10px] text-white/40">Response within 24 hours</span>
+                </div>
+
+                <div className="bg-[#12192e]/90 border border-white/10 hover:border-cyan-500/40 rounded-xl p-3.5 flex flex-col gap-2 transition-all">
+                  <div className="flex items-center gap-2.5 text-emerald-400">
+                    <i className="fa-solid fa-phone text-sm" />
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-white/60">Operations Helpline</span>
+                  </div>
+                  <a
+                    href="tel:+919876543210"
+                    className="text-xs font-mono font-bold text-white hover:text-emerald-300 transition-colors"
+                  >
+                    +91 98765 43210
+                  </a>
+                  <span className="text-[10px] text-white/40">Mon - Sat: 9:00 AM - 7:00 PM IST</span>
+                </div>
+              </div>
+
+              {/* Quick Inquiry Form */}
+              <div className="bg-[#12192e]/80 border border-white/10 rounded-xl p-4 flex flex-col gap-3">
+                <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                  <span className="text-xs font-bold text-white tracking-wide uppercase flex items-center gap-2 font-heading">
+                    <i className="fa-solid fa-paper-plane text-cyan-400 text-xs" /> Submit Onboarding Request
+                  </span>
+                  <span className="text-[10px] text-white/40">Direct Dispatch</span>
+                </div>
+
+                {contactSubmitted ? (
+                  <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col items-center justify-center text-center gap-2 py-6">
+                    <div className="w-10 h-10 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 text-lg">
+                      <i className="fa-solid fa-check" />
+                    </div>
+                    <h4 className="text-sm font-bold text-white">Request Received Successfully!</h4>
+                    <p className="text-xs text-white/60 max-w-sm">
+                      Thank you! An Aculion representative will review your location details and contact you shortly at <span className="text-emerald-300 font-mono">{contactFormData.phone || user?.email || 'your registered contact'}</span>.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => { setContactSubmitted(false); setShowContactModal(false); }}
+                      className="mt-2 px-4 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold cursor-pointer transition-all"
+                    >
+                      Done
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleContactSubmit} className="flex flex-col gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[11px] font-semibold text-white/70">Proposed Location / Landmark *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Anna Nagar 2nd Avenue, Chennai"
+                          value={contactFormData.location}
+                          onChange={(e) => setContactFormData(prev => ({ ...prev, location: e.target.value }))}
+                          className="bg-[#141d33] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/30 focus:outline-none focus:border-cyan-500"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[11px] font-semibold text-white/70">Contact Phone Number *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. +91 98765 43210"
+                          value={contactFormData.phone}
+                          onChange={(e) => setContactFormData(prev => ({ ...prev, phone: e.target.value }))}
+                          className="bg-[#141d33] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/30 font-mono focus:outline-none focus:border-cyan-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[11px] font-semibold text-white/70">Billboard Type</label>
+                        <select
+                          value={contactFormData.billboardType}
+                          onChange={(e) => setContactFormData(prev => ({ ...prev, billboardType: e.target.value }))}
+                          className="bg-[#141d33] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 cursor-pointer"
+                        >
+                          <option value="Digital Billboard">Digital Billboard (LED)</option>
+                          <option value="Static Billboard">Static Billboard (Unipole / Traditional)</option>
+                          <option value="Transit Media">Transit / Gantry Media</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[11px] font-semibold text-white/70">Approx Size / Dimensions</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 40 ft × 20 ft"
+                          value={contactFormData.dimensions}
+                          onChange={(e) => setContactFormData(prev => ({ ...prev, dimensions: e.target.value }))}
+                          className="bg-[#141d33] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/30 focus:outline-none focus:border-cyan-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[11px] font-semibold text-white/70">Additional Details / Notes</label>
+                      <textarea
+                        rows="2"
+                        placeholder="e.g. Existing gantry facing high-traffic junction, seeking camera telemetry setup."
+                        value={contactFormData.notes}
+                        onChange={(e) => setContactFormData(prev => ({ ...prev, notes: e.target.value }))}
+                        className="bg-[#141d33] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/30 focus:outline-none focus:border-cyan-500 resize-none"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowContactModal(false)}
+                        className="px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-xs font-semibold transition-all cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={contactSubmitting}
+                        className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white text-xs font-semibold shadow-lg shadow-blue-500/25 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {contactSubmitting ? (
+                          <>
+                            <i className="fa-solid fa-spinner animate-spin text-xs" />
+                            <span>Sending...</span>
+                          </>
+                        ) : (
+                          <>
+                            <i className="fa-solid fa-paper-plane text-xs" />
+                            <span>Submit Onboarding Request</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+
+            </div>
+
+            {/* FIXED FOOTER */}
+            <div className="p-4 sm:px-6 border-t border-white/10 flex items-center justify-between flex-shrink-0 bg-[#0b101d] text-xs">
+              <span className="text-white/40 text-[11px] flex items-center gap-1.5">
+                <i className="fa-solid fa-shield-halved text-cyan-400" /> Aculion Platform Support
+              </span>
+              <a
+                href={`mailto:contact@aculion.com?subject=Billboard%20Onboarding%20Request%20-%20${encodeURIComponent(user?.name || 'Partner')}`}
+                className="text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1.5 transition-colors"
+              >
+                <span>Direct Mail</span>
+                <i className="fa-solid fa-arrow-up-right-from-square text-[10px]" />
+              </a>
+            </div>
 
           </div>
         </div>

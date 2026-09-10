@@ -864,13 +864,23 @@ export default function LiveDashboard({
                 <span className="font-mono">Today, {formattedDate}</span>
               </div>
 
-              <button
-                onClick={onAddNewMedia || onBackToProfile}
-                className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-500/20 border border-blue-400/30 transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <i className="fa-solid fa-plus text-xs" />
-                <span>Add Media</span>
-              </button>
+              {user?.role === 'Administrator' ? (
+                <button
+                  onClick={onAddNewMedia || onBackToProfile}
+                  className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-500/20 border border-blue-400/30 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <i className="fa-solid fa-plus text-xs" />
+                  <span>Add Media</span>
+                </button>
+              ) : (
+                <button
+                  onClick={onBackToProfile}
+                  className="px-4 py-2.5 rounded-xl bg-[#121829] hover:bg-[#1a223a] text-cyan-400 text-xs font-semibold shadow-lg border border-cyan-500/30 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <i className="fa-solid fa-headset text-xs text-cyan-400" />
+                  <span>Contact Aculion to Add Media</span>
+                </button>
+              )}
             </div>
           </header>
 
