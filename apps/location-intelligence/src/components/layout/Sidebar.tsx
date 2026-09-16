@@ -54,9 +54,9 @@ export default function Sidebar({
       path: "#traffic",
     },
     {
-      name: "Demographics",
+      name: "Audience Intelligence",
       icon: Users,
-      path: "#demographics",
+      path: "#audience-intelligence",
     },
     {
       name: "Environmental Analysis",
