@@ -1555,3 +1555,51 @@ h1, h2, h3, h4, .kpi-value, .brand-name {
     transition: width 0.6s ease;
 }
 
+/* ---- Chart Container Dimension Fixes ---- */
+.trend-chart-panel {
+    min-height: 340px;
+    display: flex;
+    flex-direction: column;
+}
+
+.trend-chart-container {
+    min-height: 280px;
+    height: 280px;
+    width: 100%;
+    position: relative;
+    flex: 1;
+}
+
+#trafficTrendLineChart {
+    min-height: 280px;
+    height: 100%;
+    width: 100%;
+}
+
+.dwell-chart-container {
+    min-height: 200px;
+    height: 200px;
+    width: 100%;
+    position: relative;
+    margin-top: 12px;
+}
+
+#dwellTimeAreaGraph {
+    min-height: 200px;
+    height: 100%;
+    width: 100%;
+}
+
+.donut-chart-container {
+    min-height: 260px;
+    height: 260px;
+    width: 100%;
+    position: relative;
+}
+
+#vehicleDonutChart {
+    min-height: 260px;
+    height: 100%;
+    width: 100%;
+}
+
