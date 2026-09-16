@@ -357,12 +357,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 800);
     });
 
-    elements.exportBtn.addEventListener('click', () => {
-        showNotification("Exporting intelligence PDF report...", "success");
-        setTimeout(() => {
-            alert("ACULION Outdoor Media Intelligence Report\n========================================\nExport Successful\nGenerated: " + new Date().toLocaleString());
-        }, 500);
-    });
+    if (elements.exportBtn) {
+        elements.exportBtn.addEventListener('click', () => {
+            showNotification("Generating & downloading PDF report...", "success");
+            try {
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({ type: 'ACULION_GENERATE_REPORT_PDF' }, '*');
+                }
+            } catch (e) {
+                console.error("Error dispatching report request:", e);
+            }
+        });
+    }
 
     function showNotification(msg) {
         elements.lastUpdatedTime.textContent = msg;

@@ -436,13 +436,13 @@ export default function LiveDashboard({
   };
 
   // Report generator runner - automatically triggers PDF download
-  const handleGenerateReport = (e) => {
-    e.preventDefault();
+  const handleGenerateReport = async (e) => {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
     setGeneratingReport(true);
     setReportSuccess(false);
-    setTimeout(() => {
-      setGeneratingReport(false);
-      setReportSuccess(true);
+    try {
       const idStr = `REP-${Math.floor(1000 + Math.random() * 9000)}`;
       const newRep = {
         id: idStr,
@@ -452,591 +452,645 @@ export default function LiveDashboard({
         size: '2.4 MB'
       };
       setReportsList(prev => [newRep, ...prev]);
-      downloadReportAsPDF(newRep);
-    }, 1000);
+      await downloadReportAsPDF(newRep);
+      setReportSuccess(true);
+    } catch (err) {
+      console.error("Error generating report PDF:", err);
+    } finally {
+      setGeneratingReport(false);
+    }
   };
+
+  // Listen for export report messages from iframe (e.g. from Audience Intelligence header button)
+  useEffect(() => {
+    const handleReportMsg = (e) => {
+      if (e.data && e.data.type === 'ACULION_GENERATE_REPORT_PDF') {
+        handleGenerateReport();
+      }
+    };
+    window.addEventListener('message', handleReportMsg);
+    return () => window.removeEventListener('message', handleReportMsg);
+  }, [dbTrafficData, selectedBillboard, user, reportType]);
 
   // Download restructured spacious 3-page report as high-quality PDF
   const downloadReportAsPDF = async (rep) => {
-    // Pre-load the Aculion logo via fetch → FileReader
-    const logoDataUrl = await fetch(transparentLogo)
-      .then(r => r.blob())
-      .then(blob => new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(blob);
-      }))
-      .catch(() => null);
+    try {
+      const reportId = (rep && typeof rep === 'object' && rep.id && typeof rep.id === 'string') 
+        ? rep.id 
+        : `REP-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pageW = doc.internal.pageSize.getWidth();
-    const pageH = doc.internal.pageSize.getHeight();
-    const margin = 12;
-    const contentW = pageW - margin * 2;
+      // Pre-load the Aculion logo safely with timeout
+      let logoDataUrl = null;
+      try {
+        const logoFetchPromise = fetch(transparentLogo)
+          .then(r => r.blob())
+          .then(blob => new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+          }))
+          .catch(() => null);
 
-    const ownerName = user?.name || selectedBillboard?.owner_name || 'Aculion Media Partner';
-    const companyName = user?.company || selectedBillboard?.company_name || 'Premier Out-Of-Home Media Network';
-    const bbCode = selectedBillboard?.billboard_code || selectedBillboard?.id || 'ACU-BB-0004';
-    const bbName = selectedBillboard?.billboard_name || selectedBillboard?.name || 'Primary Corridor Media Asset';
-    const landmark = selectedBillboard?.location_landmark || selectedBillboard?.street_address || selectedBillboard?.location || 'Prime Commercial Corridor';
-    const city = selectedBillboard?.city || 'Chennai';
-
-    // Real database telemetry data extraction
-    const liveStats = dbTrafficData || {
-      total_vehicles: 17820,
-      bikes: 4760,
-      commercial: 1980,
-      economy: 8420,
-      premium: 2130,
-      luxury: 850,
-      ultra_luxury: 210,
-      avg_exposure_time: 14.8,
-      max_exposure_time: 58.2,
-      estimated_reach: 42500,
-      flow_rate: 84.5,
-      peak_traffic_hour: '06:00 PM – 07:00 PM',
-      radxa_code: 'RADXA-04'
-    };
-
-    const totalV = Number(liveStats.total_vehicles) || 17820;
-    const bikesV = Number(liveStats.bikes) || 4760;
-    const commV = Number(liveStats.commercial) || 1980;
-    const econV = Number(liveStats.economy) || 8420;
-    const premV = Number(liveStats.premium) || 2130;
-    const luxV = Number(liveStats.luxury) || 850;
-    const ultraV = Number(liveStats.ultra_luxury) || 210;
-
-    const reachV = Number(liveStats.estimated_reach) || Math.round(totalV * 2.4);
-    const dwellV = Number(liveStats.avg_exposure_time) || 14.8;
-    const maxDwellV = Number(liveStats.max_exposure_time) || 58.2;
-    const flowV = Number(liveStats.flow_rate) || 84.5;
-    const peakHourStr = liveStats.peak_traffic_hour || '06:00 PM – 07:00 PM';
-    const radxaId = liveStats.radxa_code || 'RADXA-04';
-
-    const highEndV = premV + luxV + ultraV;
-    const highEndPct = ((highEndV / totalV) * 100).toFixed(1);
-
-    const categories = [
-      { name: 'Bike', desc: 'Two-Wheelers & Couriers', count: bikesV, pct: +((bikesV / totalV) * 100).toFixed(1), color: '#1E88FF' },
-      { name: 'Commercial', desc: 'Freight, Vans & Logistics', count: commV, pct: +((commV / totalV) * 100).toFixed(1), color: '#00C4FF' },
-      { name: 'Economy', desc: 'Hatchbacks & Mass Commuters', count: econV, pct: +((econV / totalV) * 100).toFixed(1), color: '#8B5CF6' },
-      { name: 'Premium', desc: 'Executive Sedans & Compact SUVs', count: premV, pct: +((premV / totalV) * 100).toFixed(1), color: '#F59E0B' },
-      { name: 'Luxury', desc: 'High-End Sedans & Premium SUVs', count: luxV, pct: +((luxV / totalV) * 100).toFixed(1), color: '#10B981' },
-      { name: 'Ultra Luxury', desc: 'Supercars & Exclusive Flagships', count: ultraV, pct: +((ultraV / totalV) * 100).toFixed(1), color: '#F97316' }
-    ];
-
-    // ── Helper functions ──────────────────────────────────────
-    const hex = (h) => {
-      const r = parseInt(h.slice(1, 3), 16);
-      const g = parseInt(h.slice(3, 5), 16);
-      const b = parseInt(h.slice(5, 7), 16);
-      return [r, g, b];
-    };
-
-    const fillRect = (x, y, w, h, color) => {
-      doc.setFillColor(...hex(color));
-      doc.rect(x, y, w, h, 'F');
-    };
-
-    const text = (str, x, y, opts = {}) => {
-      doc.text(String(str), x, y, opts);
-    };
-
-    const setFont = (style = 'normal', size = 10, color = '#FFFFFF') => {
-      doc.setFont('helvetica', style);
-      doc.setFontSize(size);
-      doc.setTextColor(...hex(color));
-    };
-
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
-
-    const drawHeader = (pageNum, pageTitle) => {
-      fillRect(0, 0, pageW, 26, '#0d1b40');
-      fillRect(0, 26, pageW, 1.2, '#2563eb');
-
-      // Top Left: Company & Media Owner
-      setFont('bold', 11, '#FFFFFF');
-      text(companyName.toUpperCase(), margin, 9);
-      setFont('normal', 7.5, '#93c5fd');
-      text(`MEDIA OWNER: ${ownerName}   |   ASSET: ${bbCode} (${bbName})`, margin, 15);
-      setFont('normal', 6.8, '#64748b');
-      text(`LOCATION: ${landmark}, ${city}   |   RADXA NODE: ${radxaId}`, margin, 20.5);
-
-      // Top Right: Report label & ID
-      setFont('bold', 8.5, '#38bdf8');
-      text(pageTitle || 'AUDIENCE MOBILITY INTELLIGENCE', pageW - margin, 9, { align: 'right' });
-      setFont('normal', 7, '#94a3b8');
-      text(`ID: ${rep.id}   •   Page ${pageNum} of 3`, pageW - margin, 15, { align: 'right' });
-      text(`Generated: ${dateStr}`, pageW - margin, 20.5, { align: 'right' });
-    };
-
-    const drawFooter = (pageNum) => {
-      fillRect(0, pageH - 14, pageW, 14, '#0d1b40');
-      fillRect(0, pageH - 14, pageW, 0.8, '#2563eb');
-
-      if (logoDataUrl) {
-        const logoH = 8;
-        const logoW = logoH * 4.2;
-        doc.addImage(logoDataUrl, 'PNG', margin, pageH - 11, logoW, logoH);
-      } else {
-        setFont('bold', 9, '#FFFFFF');
-        text('ACULION', margin, pageH - 5.5);
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 1500));
+        logoDataUrl = await Promise.race([logoFetchPromise, timeoutPromise]);
+      } catch (logoErr) {
+        logoDataUrl = null;
       }
 
-      setFont('normal', 7, '#93c5fd');
-      text(`AUDIENCE MOBILITY PLATFORM   •   VERIFIED OUT-OF-HOME ANALYTICS   •   PAGE ${pageNum} OF 3`, pageW - margin, pageH - 5.5, { align: 'right' });
-    };
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const margin = 12;
+      const contentW = pageW - margin * 2;
 
-    // ══════════════════════════════════════════════════════════
-    // PAGE 1: EXECUTIVE SUMMARY & VEHICLE CLASSIFICATION PIE CHART
-    // ══════════════════════════════════════════════════════════
-    fillRect(0, 0, pageW, pageH, '#0a0e1a');
-    drawHeader(1, 'AUDIENCE MOBILITY REPORT');
+      const ownerName = user?.name || selectedBillboard?.owner_name || 'Aculion Media Partner';
+      const companyName = user?.company || selectedBillboard?.company_name || 'Premier Out-Of-Home Media Network';
+      const bbCode = selectedBillboard?.billboard_code || selectedBillboard?.id || 'ACU-BB-0004';
+      const bbName = selectedBillboard?.billboard_name || selectedBillboard?.name || 'Primary Corridor Media Asset';
+      const landmark = selectedBillboard?.location_landmark || selectedBillboard?.street_address || selectedBillboard?.location || 'Prime Commercial Corridor';
+      const city = selectedBillboard?.city || 'Chennai';
 
-    let y = 33;
+      // Real database telemetry data extraction
+      const liveStats = dbTrafficData || {
+        total_vehicles: 17820,
+        bikes: 4760,
+        commercial: 1980,
+        economy: 8420,
+        premium: 2130,
+        luxury: 850,
+        ultra_luxury: 210,
+        avg_exposure_time: 14.8,
+        max_exposure_time: 58.2,
+        estimated_reach: 42500,
+        flow_rate: 84.5,
+        peak_traffic_hour: '06:00 PM – 07:00 PM',
+        radxa_code: 'RADXA-04'
+      };
 
-    // Report Title Block
-    setFont('bold', 12, '#FFFFFF');
-    text(`${bbName} — Audience Mobility & Exposure Analysis`, margin, y);
-    y += 5.5;
-    setFont('normal', 7.2, '#64748b');
-    text(`Observation Period: Real-time Live Sync   •   Display Type: High-Impact DOOH Media   •   Audit Status: AI Verified`, margin, y);
-    y += 8;
+      const totalV = Number(liveStats.total_vehicles) || 17820;
+      const bikesV = Number(liveStats.bikes) || 4760;
+      const commV = Number(liveStats.commercial) || 1980;
+      const econV = Number(liveStats.economy) || 8420;
+      const premV = Number(liveStats.premium) || 2130;
+      const luxV = Number(liveStats.luxury) || 850;
+      const ultraV = Number(liveStats.ultra_luxury) || 210;
 
-    // Section 1: Executive Mobility KPIs (4 spacious cards)
-    fillRect(margin, y, contentW, 6, '#1e3a8a');
-    fillRect(margin, y, 3, 6, '#38bdf8');
-    setFont('bold', 7.5, '#93c5fd');
-    text('  EXECUTIVE MOBILITY & AUDIENCE VOLUME OVERVIEW', margin + 3.5, y + 4.2);
-    y += 8.5;
+      const reachV = Number(liveStats.estimated_reach) || Math.round(totalV * 2.4);
+      const dwellV = Number(liveStats.avg_exposure_time) || 14.8;
+      const maxDwellV = Number(liveStats.max_exposure_time) || 58.2;
+      const flowV = Number(liveStats.flow_rate) || 84.5;
+      const peakHourStr = liveStats.peak_traffic_hour || '06:00 PM – 07:00 PM';
+      const radxaId = liveStats.radxa_code || 'RADXA-04';
 
-    const kpiBoxes = [
-      { label: 'TOTAL VEHICLES DETECTED', val: totalV.toLocaleString(), sub: 'Verified Flow Count', col: '#38bdf8' },
-      { label: 'ESTIMATED AUDIENCE REACH', val: reachV.toLocaleString(), sub: 'Gross Impressions', col: '#10b981' },
-      { label: 'AVERAGE DWELL DURATION', val: `${dwellV}s`, sub: `Max Exposure: ${maxDwellV}s`, col: '#00f0ff' },
-      { label: 'PEAK MOBILITY WINDOW', val: peakHourStr, sub: `Flow: ${flowV} veh/min`, col: '#f59e0b' }
-    ];
+      const highEndV = premV + luxV + ultraV;
+      const highEndPct = ((highEndV / totalV) * 100).toFixed(1);
 
-    const cardW = (contentW - 3 * 3.5) / 4;
-    kpiBoxes.forEach((kpi, idx) => {
-      const bx = margin + idx * (cardW + 3.5);
-      fillRect(bx, y, cardW, 19, '#111827');
-      fillRect(bx, y, cardW, 1.2, kpi.col);
-      setFont('bold', 5.6, '#94a3b8');
-      text(kpi.label, bx + 3, y + 4.5);
-      setFont('bold', 9.5, kpi.col);
-      text(kpi.val, bx + 3, y + 11.5);
-      setFont('normal', 5.6, '#64748b');
-      text(kpi.sub, bx + 3, y + 16);
-    });
-    y += 24;
+      const categories = [
+        { name: 'Bike', desc: 'Two-Wheelers & Couriers', count: bikesV, pct: +((bikesV / totalV) * 100).toFixed(1), color: '#1E88FF' },
+        { name: 'Commercial', desc: 'Freight, Vans & Logistics', count: commV, pct: +((commV / totalV) * 100).toFixed(1), color: '#00C4FF' },
+        { name: 'Economy', desc: 'Hatchbacks & Mass Commuters', count: econV, pct: +((econV / totalV) * 100).toFixed(1), color: '#8B5CF6' },
+        { name: 'Premium', desc: 'Executive Sedans & Compact SUVs', count: premV, pct: +((premV / totalV) * 100).toFixed(1), color: '#F59E0B' },
+        { name: 'Luxury', desc: 'High-End Sedans & Premium SUVs', count: luxV, pct: +((luxV / totalV) * 100).toFixed(1), color: '#10B981' },
+        { name: 'Ultra Luxury', desc: 'Supercars & Exclusive Flagships', count: ultraV, pct: +((ultraV / totalV) * 100).toFixed(1), color: '#F97316' }
+      ];
 
-    // Section 2: Vehicle Classification Distribution (Vector Donut/Pie Chart + Legend Table)
-    fillRect(margin, y, contentW, 6, '#1a1a2e');
-    fillRect(margin, y, 3, 6, '#8b5cf6');
-    setFont('bold', 7.5, '#c084fc');
-    text('  VEHICLE CLASSIFICATION DISTRIBUTION & AFFLUENCE RATIOS', margin + 3.5, y + 4.2);
-    y += 8.5;
+      // ── Helper functions ──────────────────────────────────────
+      const hex = (h) => {
+        const r = parseInt(h.slice(1, 3), 16);
+        const g = parseInt(h.slice(3, 5), 16);
+        const b = parseInt(h.slice(5, 7), 16);
+        return [r, g, b];
+      };
 
-    // Draw Vector Donut Chart
-    const pieBoxH = 76;
-    fillRect(margin, y, contentW, pieBoxH, '#111827');
-    fillRect(margin, y, contentW, 1, '#1e293b');
+      const fillRect = (x, y, w, h, color) => {
+        doc.setFillColor(...hex(color));
+        doc.rect(x, y, w, h, 'F');
+      };
 
-    const chartCx = margin + 36;
-    const chartCy = y + 38;
-    const outerR = 27;
-    const innerR = 14;
+      const text = (str, x, y, opts = {}) => {
+        doc.text(String(str), x, y, opts);
+      };
 
-    let currentAngle = -Math.PI / 2;
-    categories.forEach((seg) => {
-      if (seg.pct <= 0) return;
-      const sliceAngle = (seg.pct / 100) * (2 * Math.PI);
-      const steps = Math.max(8, Math.ceil(sliceAngle / (Math.PI / 36)));
-      const dAngle = sliceAngle / steps;
+      const setFont = (style = 'normal', size = 10, color = '#FFFFFF') => {
+        doc.setFont('helvetica', style);
+        doc.setFontSize(size);
+        doc.setTextColor(...hex(color));
+      };
 
-      doc.setFillColor(...hex(seg.color));
-      for (let i = 0; i < steps; i++) {
-        const a1 = currentAngle + i * dAngle;
-        const a2 = currentAngle + (i + 1) * dAngle;
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
 
-        const x1 = chartCx + outerR * Math.cos(a1);
-        const y1 = chartCy + outerR * Math.sin(a1);
-        const x2 = chartCx + outerR * Math.cos(a2);
-        const y2 = chartCy + outerR * Math.sin(a2);
+      const drawHeader = (pageNum, pageTitle) => {
+        fillRect(0, 0, pageW, 26, '#0d1b40');
+        fillRect(0, 26, pageW, 1.2, '#2563eb');
 
-        const ix1 = chartCx + innerR * Math.cos(a1);
-        const iy1 = chartCy + innerR * Math.sin(a1);
-        const ix2 = chartCx + innerR * Math.cos(a2);
-        const iy2 = chartCy + innerR * Math.sin(a2);
+        // Top Left: Company & Media Owner
+        setFont('bold', 11, '#FFFFFF');
+        text(companyName.toUpperCase(), margin, 9);
+        setFont('normal', 7.5, '#93c5fd');
+        text(`MEDIA OWNER: ${ownerName}   |   ASSET: ${bbCode} (${bbName})`, margin, 15);
+        setFont('normal', 6.8, '#64748b');
+        text(`LOCATION: ${landmark}, ${city}   |   RADXA NODE: ${radxaId}`, margin, 20.5);
 
-        doc.triangle(x1, y1, x2, y2, ix1, iy1, 'F');
-        doc.triangle(x2, y2, ix2, iy2, ix1, iy1, 'F');
+        // Top Right: Report label & ID
+        setFont('bold', 8.5, '#38bdf8');
+        text(pageTitle || 'AUDIENCE MOBILITY INTELLIGENCE', pageW - margin, 9, { align: 'right' });
+        setFont('normal', 7, '#94a3b8');
+        text(`ID: ${reportId}   •   Page ${pageNum} of 3`, pageW - margin, 15, { align: 'right' });
+        text(`Generated: ${dateStr}`, pageW - margin, 20.5, { align: 'right' });
+      };
+
+      const drawFooter = (pageNum) => {
+        fillRect(0, pageH - 14, pageW, 14, '#0d1b40');
+        fillRect(0, pageH - 14, pageW, 0.8, '#2563eb');
+
+        if (logoDataUrl) {
+          try {
+            const logoH = 8;
+            const logoW = logoH * 4.2;
+            doc.addImage(logoDataUrl, 'PNG', margin, pageH - 11, logoW, logoH);
+          } catch (imgErr) {
+            setFont('bold', 9, '#FFFFFF');
+            text('ACULION', margin, pageH - 5.5);
+          }
+        } else {
+          setFont('bold', 9, '#FFFFFF');
+          text('ACULION', margin, pageH - 5.5);
+        }
+
+        setFont('normal', 7, '#93c5fd');
+        text(`AUDIENCE MOBILITY PLATFORM   •   VERIFIED OUT-OF-HOME ANALYTICS   •   PAGE ${pageNum} OF 3`, pageW - margin, pageH - 5.5, { align: 'right' });
+      };
+
+      // ══════════════════════════════════════════════════════════
+      // PAGE 1: EXECUTIVE SUMMARY & VEHICLE CLASSIFICATION PIE CHART
+      // ══════════════════════════════════════════════════════════
+      fillRect(0, 0, pageW, pageH, '#0a0e1a');
+      drawHeader(1, 'AUDIENCE MOBILITY REPORT');
+
+      let y = 33;
+
+      // Report Title Block
+      setFont('bold', 12, '#FFFFFF');
+      text(`${bbName} — Audience Mobility & Exposure Analysis`, margin, y);
+      y += 5.5;
+      setFont('normal', 7.2, '#64748b');
+      text(`Observation Period: Real-time Live Sync   •   Display Type: High-Impact DOOH Media   •   Audit Status: AI Verified`, margin, y);
+      y += 8;
+
+      // Section 1: Executive Mobility KPIs (4 spacious cards)
+      fillRect(margin, y, contentW, 6, '#1e3a8a');
+      fillRect(margin, y, 3, 6, '#38bdf8');
+      setFont('bold', 7.5, '#93c5fd');
+      text('  EXECUTIVE MOBILITY & AUDIENCE VOLUME OVERVIEW', margin + 3.5, y + 4.2);
+      y += 8.5;
+
+      const kpiBoxes = [
+        { label: 'TOTAL VEHICLES DETECTED', val: totalV.toLocaleString(), sub: 'Verified Flow Count', col: '#38bdf8' },
+        { label: 'ESTIMATED AUDIENCE REACH', val: reachV.toLocaleString(), sub: 'Gross Impressions', col: '#10b981' },
+        { label: 'AVERAGE DWELL DURATION', val: `${dwellV}s`, sub: `Max Exposure: ${maxDwellV}s`, col: '#00f0ff' },
+        { label: 'PEAK MOBILITY WINDOW', val: peakHourStr, sub: `Flow: ${flowV} veh/min`, col: '#f59e0b' }
+      ];
+
+      const cardW = (contentW - 3 * 3.5) / 4;
+      kpiBoxes.forEach((kpi, idx) => {
+        const bx = margin + idx * (cardW + 3.5);
+        fillRect(bx, y, cardW, 19, '#111827');
+        fillRect(bx, y, cardW, 1.2, kpi.col);
+        setFont('bold', 5.6, '#94a3b8');
+        text(kpi.label, bx + 3, y + 4.5);
+        setFont('bold', 9.5, kpi.col);
+        text(kpi.val, bx + 3, y + 11.5);
+        setFont('normal', 5.6, '#64748b');
+        text(kpi.sub, bx + 3, y + 16);
+      });
+      y += 24;
+
+      // Section 2: Vehicle Classification Distribution (Vector Donut/Pie Chart + Legend Table)
+      fillRect(margin, y, contentW, 6, '#1a1a2e');
+      fillRect(margin, y, 3, 6, '#8b5cf6');
+      setFont('bold', 7.5, '#c084fc');
+      text('  VEHICLE CLASSIFICATION DISTRIBUTION & AFFLUENCE RATIOS', margin + 3.5, y + 4.2);
+      y += 8.5;
+
+      // Draw Vector Donut Chart
+      const pieBoxH = 76;
+      fillRect(margin, y, contentW, pieBoxH, '#111827');
+      fillRect(margin, y, contentW, 1, '#1e293b');
+
+      const chartCx = margin + 36;
+      const chartCy = y + 38;
+      const outerR = 27;
+      const innerR = 14;
+
+      let currentAngle = -Math.PI / 2;
+      categories.forEach((seg) => {
+        if (seg.pct <= 0) return;
+        const sliceAngle = (seg.pct / 100) * (2 * Math.PI);
+        const steps = Math.max(8, Math.ceil(sliceAngle / (Math.PI / 36)));
+        const dAngle = sliceAngle / steps;
+
+        doc.setFillColor(...hex(seg.color));
+        for (let i = 0; i < steps; i++) {
+          const a1 = currentAngle + i * dAngle;
+          const a2 = currentAngle + (i + 1) * dAngle;
+
+          const x1 = chartCx + outerR * Math.cos(a1);
+          const y1 = chartCy + outerR * Math.sin(a1);
+          const x2 = chartCx + outerR * Math.cos(a2);
+          const y2 = chartCy + outerR * Math.sin(a2);
+
+          const ix1 = chartCx + innerR * Math.cos(a1);
+          const iy1 = chartCy + innerR * Math.sin(a1);
+          const ix2 = chartCx + innerR * Math.cos(a2);
+          const iy2 = chartCy + innerR * Math.sin(a2);
+
+          doc.triangle(x1, y1, x2, y2, ix1, iy1, 'F');
+          doc.triangle(x2, y2, ix2, iy2, ix1, iy1, 'F');
+        }
+        currentAngle += sliceAngle;
+      });
+
+      // Donut hole center
+      doc.setFillColor(...hex('#111827'));
+      doc.circle(chartCx, chartCy, innerR, 'F');
+      setFont('bold', 5.5, '#94a3b8');
+      text('TOTAL VEHICLES', chartCx, chartCy - 2, { align: 'center' });
+      setFont('bold', 8.5, '#FFFFFF');
+      text(totalV.toLocaleString(), chartCx, chartCy + 3.2, { align: 'center' });
+
+      // Table on the right side of the donut chart
+      const tableX = margin + 74;
+      const tableW = contentW - 76;
+      let tableY = y + 4;
+
+      // Table Header
+      fillRect(tableX, tableY, tableW, 5.5, '#1e293b');
+      setFont('bold', 6.2, '#94a3b8');
+      text('CATEGORY', tableX + 3, tableY + 3.8);
+      text('VEHICLES', tableX + 42, tableY + 3.8);
+      text('PERCENT', tableX + 70, tableY + 3.8);
+      text('DISTRIBUTION', tableX + 88, tableY + 3.8);
+      tableY += 6.5;
+
+      categories.forEach((seg, i) => {
+        const rowBg = i % 2 === 0 ? '#0f172a' : '#111827';
+        fillRect(tableX, tableY, tableW, 9.2, rowBg);
+
+        // Color swatch dot
+        doc.setFillColor(...hex(seg.color));
+        doc.circle(tableX + 4, tableY + 4.5, 1.6, 'F');
+
+        setFont('bold', 6.8, '#FFFFFF');
+        text(seg.name, tableX + 8, tableY + 4.2);
+        setFont('normal', 5.2, '#64748b');
+        text(seg.desc, tableX + 8, tableY + 7.5);
+
+        setFont('bold', 6.8, '#e2e8f0');
+        text(seg.count.toLocaleString(), tableX + 42, tableY + 5.5);
+
+        setFont('bold', 7, seg.color);
+        text(`${seg.pct}%`, tableX + 70, tableY + 5.5);
+
+        // Horizontal Bar indicator
+        const barMaxW = 20;
+        const barW = Math.max(1.5, (seg.pct / 100) * barMaxW);
+        fillRect(tableX + 88, tableY + 3.5, barMaxW, 3, '#1f293d');
+        fillRect(tableX + 88, tableY + 3.5, barW, 3, seg.color);
+
+        tableY += 9.6;
+      });
+
+      y += pieBoxH + 6;
+
+      // Section 3: Audience Demographic Takeaways Box
+      fillRect(margin, y, contentW, 6, '#0f291e');
+      fillRect(margin, y, 3, 6, '#10b981');
+      setFont('bold', 7.5, '#6ee7b7');
+      text('  AUDIENCE DEMOGRAPHIC & AFFLUENCE TAKEAWAYS', margin + 3.5, y + 4.2);
+      y += 8.5;
+
+      fillRect(margin, y, contentW, 26, '#0f172a');
+      fillRect(margin, y, contentW, 1, '#1e293b');
+      setFont('normal', 7, '#cbd5e1');
+      text(`• Out of ${totalV.toLocaleString()} detected vehicles, ${highEndPct}% (${highEndV.toLocaleString()} vehicles) belong to Premium, Luxury, and Ultra-Luxury categories.`, margin + 3.5, y + 5.5);
+      text(`  This confirms an affluent audience profile with substantial purchasing power passing directly within the primary billboard visual cone.`, margin + 3.5, y + 10.5);
+      text(`• With an average dwell duration of ${dwellV} seconds at this junction, advertisement recall index is measured at 84.2%, outperforming standard OOH averages.`, margin + 3.5, y + 15.5);
+      text(`• The peak audience volume window is recorded at ${peakHourStr}, delivering peak brand visibility for premium consumer campaigns.`, margin + 3.5, y + 20.5);
+
+      drawFooter(1);
+
+      // ══════════════════════════════════════════════════════════
+      // PAGE 2: HOURLY MOBILITY LINE CHART & VERTICAL BAR CHART
+      // ══════════════════════════════════════════════════════════
+      doc.addPage();
+      fillRect(0, 0, pageW, pageH, '#0a0e1a');
+      drawHeader(2, 'MOBILITY TRENDS & VEHICLE COMPARISON');
+
+      y = 33;
+
+      // Section 4: 24-Hour Mobility Flow Trend (Vector Line Chart)
+      fillRect(margin, y, contentW, 6, '#1e3a8a');
+      fillRect(margin, y, 3, 6, '#00f0ff');
+      setFont('bold', 7.5, '#7dd3fc');
+      text('  24-HOUR AUDIENCE MOBILITY FLOW TREND (LINE CHART)', margin + 3.5, y + 4.2);
+      y += 8.5;
+
+      const lineChartH = 68;
+      fillRect(margin, y, contentW, lineChartH, '#111827');
+      fillRect(margin, y, contentW, 1, '#1e293b');
+
+      const hourlyTrendData = [
+        { label: '06 AM', val: Math.round(flowV * 0.35) },
+        { label: '08 AM', val: Math.round(flowV * 0.82) },
+        { label: '10 AM', val: Math.round(flowV * 0.95) },
+        { label: '12 PM', val: Math.round(flowV * 0.74) },
+        { label: '02 PM', val: Math.round(flowV * 0.68) },
+        { label: '04 PM', val: Math.round(flowV * 0.88) },
+        { label: '06 PM', val: Math.round(flowV * 1.15) },
+        { label: '08 PM', val: Math.round(flowV * 0.92) },
+        { label: '10 PM', val: Math.round(flowV * 0.45) }
+      ];
+
+      const chartLeft = margin + 22;
+      const chartRight = margin + contentW - 14;
+      const chartTop = y + 10;
+      const chartBottom = y + lineChartH - 15;
+      const plotW = chartRight - chartLeft;
+      const plotH = chartBottom - chartTop;
+
+      const maxLineVal = Math.max(...hourlyTrendData.map(d => d.val)) * 1.15 || 120;
+
+      // Gridlines
+      const gridSteps = 4;
+      for (let i = 0; i <= gridSteps; i++) {
+        const gy = chartBottom - (i / gridSteps) * plotH;
+        const gVal = Math.round((i / gridSteps) * maxLineVal);
+        doc.setDrawColor(...hex('rgba(255, 255, 255, 0.08)'));
+        doc.setLineWidth(0.2);
+        doc.line(chartLeft, gy, chartRight, gy);
+
+        setFont('normal', 5.6, '#64748b');
+        text(`${gVal} /min`, chartLeft - 2.5, gy + 1.2, { align: 'right' });
       }
-      currentAngle += sliceAngle;
-    });
 
-    // Donut hole center
-    doc.setFillColor(...hex('#111827'));
-    doc.circle(chartCx, chartCy, innerR, 'F');
-    setFont('bold', 5.5, '#94a3b8');
-    text('TOTAL VEHICLES', chartCx, chartCy - 2, { align: 'center' });
-    setFont('bold', 8.5, '#FFFFFF');
-    text(totalV.toLocaleString(), chartCx, chartCy + 3.2, { align: 'center' });
+      // Coordinates
+      const coords = hourlyTrendData.map((pt, idx) => {
+        const px = chartLeft + (idx / (hourlyTrendData.length - 1)) * plotW;
+        const py = chartBottom - (pt.val / maxLineVal) * plotH;
+        return { x: px, y: py, ...pt };
+      });
 
-    // Table on the right side of the donut chart
-    const tableX = margin + 74;
-    const tableW = contentW - 76;
-    let tableY = y + 4;
+      // Shaded area underneath line
+      for (let i = 0; i < coords.length - 1; i++) {
+        const p1 = coords[i];
+        const p2 = coords[i + 1];
+        doc.setFillColor(...hex('#0d253f'));
+        doc.triangle(p1.x, p1.y, p2.x, p2.y, p1.x, chartBottom, 'F');
+        doc.triangle(p2.x, p2.y, p2.x, chartBottom, p1.x, chartBottom, 'F');
+      }
 
-    // Table Header
-    fillRect(tableX, tableY, tableW, 5.5, '#1e293b');
-    setFont('bold', 6.2, '#94a3b8');
-    text('CATEGORY', tableX + 3, tableY + 3.8);
-    text('VEHICLES', tableX + 42, tableY + 3.8);
-    text('PERCENT', tableX + 70, tableY + 3.8);
-    text('DISTRIBUTION', tableX + 88, tableY + 3.8);
-    tableY += 6.5;
+      // Main line
+      doc.setDrawColor(...hex('#00F0FF'));
+      doc.setLineWidth(0.8);
+      for (let i = 0; i < coords.length - 1; i++) {
+        doc.line(coords[i].x, coords[i].y, coords[i + 1].x, coords[i + 1].y);
+      }
 
-    categories.forEach((seg, i) => {
-      const rowBg = i % 2 === 0 ? '#0f172a' : '#111827';
-      fillRect(tableX, tableY, tableW, 9.2, rowBg);
+      // Dots & Labels
+      coords.forEach((pt) => {
+        doc.setFillColor(...hex('#00F0FF'));
+        doc.circle(pt.x, pt.y, 1.3, 'F');
+        doc.setFillColor(...hex('#FFFFFF'));
+        doc.circle(pt.x, pt.y, 0.6, 'F');
 
-      // Color swatch dot
-      doc.setFillColor(...hex(seg.color));
-      doc.circle(tableX + 4, tableY + 4.5, 1.6, 'F');
+        setFont('normal', 5.8, '#94a3b8');
+        text(pt.label, pt.x, chartBottom + 5.5, { align: 'center' });
+      });
 
-      setFont('bold', 6.8, '#FFFFFF');
-      text(seg.name, tableX + 8, tableY + 4.2);
-      setFont('normal', 5.2, '#64748b');
-      text(seg.desc, tableX + 8, tableY + 7.5);
+      // Peak callout badge
+      const peakCoord = coords.reduce((max, pt) => pt.val > max.val ? pt : max, coords[0]);
+      if (peakCoord) {
+        fillRect(peakCoord.x - 16, peakCoord.y - 7.5, 32, 5.5, '#1e3a8a');
+        doc.setDrawColor(...hex('#38bdf8'));
+        doc.setLineWidth(0.3);
+        doc.rect(peakCoord.x - 16, peakCoord.y - 7.5, 32, 5.5, 'D');
+        setFont('bold', 5.5, '#38bdf8');
+        text(`Peak: ${peakCoord.val} veh/min`, peakCoord.x, peakCoord.y - 3.8, { align: 'center' });
+      }
 
-      setFont('bold', 6.8, '#e2e8f0');
-      text(seg.count.toLocaleString(), tableX + 42, tableY + 5.5);
+      y += lineChartH + 7;
 
-      setFont('bold', 7, seg.color);
-      text(`${seg.pct}%`, tableX + 70, tableY + 5.5);
+      // Section 5: Vehicle Category Comparison (Vertical Bar Chart)
+      fillRect(margin, y, contentW, 6, '#1a1a2e');
+      fillRect(margin, y, 3, 6, '#f59e0b');
+      setFont('bold', 7.5, '#fcd34d');
+      text('  VEHICLE CATEGORY COMPARISON (VERTICAL BAR CHART)', margin + 3.5, y + 4.2);
+      y += 8.5;
 
-      // Horizontal Bar indicator
-      const barMaxW = 20;
-      const barW = Math.max(1.5, (seg.pct / 100) * barMaxW);
-      fillRect(tableX + 88, tableY + 3.5, barMaxW, 3, '#1f293d');
-      fillRect(tableX + 88, tableY + 3.5, barW, 3, seg.color);
+      const barChartH = 68;
+      fillRect(margin, y, contentW, barChartH, '#111827');
+      fillRect(margin, y, contentW, 1, '#1e293b');
 
-      tableY += 9.6;
-    });
+      const vBarLeft = margin + 14;
+      const vBarRight = margin + contentW - 14;
+      const vBarTop = y + 12;
+      const vBarBottom = y + barChartH - 16;
+      const vPlotW = vBarRight - vBarLeft;
+      const vPlotH = vBarBottom - vBarTop;
 
-    y += pieBoxH + 6;
+      const maxBarCount = Math.max(...categories.map(c => c.count)) * 1.1 || 1000;
 
-    // Section 3: Audience Demographic Takeaways Box
-    fillRect(margin, y, contentW, 6, '#0f291e');
-    fillRect(margin, y, 3, 6, '#10b981');
-    setFont('bold', 7.5, '#6ee7b7');
-    text('  AUDIENCE DEMOGRAPHIC & AFFLUENCE TAKEAWAYS', margin + 3.5, y + 4.2);
-    y += 8.5;
+      // Baseline
+      doc.setDrawColor(...hex('rgba(255, 255, 255, 0.15)'));
+      doc.setLineWidth(0.4);
+      doc.line(vBarLeft, vBarBottom, vBarRight, vBarBottom);
 
-    fillRect(margin, y, contentW, 26, '#0f172a');
-    fillRect(margin, y, contentW, 1, '#1e293b');
-    setFont('normal', 7, '#cbd5e1');
-    text(`• Out of ${totalV.toLocaleString()} detected vehicles, ${highEndPct}% (${highEndV.toLocaleString()} vehicles) belong to Premium, Luxury, and Ultra-Luxury categories.`, margin + 3.5, y + 5.5);
-    text(`  This confirms an affluent audience profile with substantial purchasing power passing directly within the primary billboard visual cone.`, margin + 3.5, y + 10.5);
-    text(`• With an average dwell duration of ${dwellV} seconds at this junction, advertisement recall index is measured at 84.2%, outperforming standard OOH averages.`, margin + 3.5, y + 15.5);
-    text(`• The peak audience volume window is recorded at ${peakHourStr}, delivering peak brand visibility for premium consumer campaigns.`, margin + 3.5, y + 20.5);
+      const slotW = vPlotW / categories.length;
+      const barWidth = Math.min(18, slotW * 0.55);
 
-    drawFooter(1);
+      categories.forEach((cat, idx) => {
+        const bx = vBarLeft + idx * slotW + (slotW - barWidth) / 2;
+        const bHeight = Math.max(3, (cat.count / maxBarCount) * vPlotH);
+        const by = vBarBottom - bHeight;
 
-    // ══════════════════════════════════════════════════════════
-    // PAGE 2: HOURLY MOBILITY LINE CHART & VERTICAL BAR CHART
-    // ══════════════════════════════════════════════════════════
-    doc.addPage();
-    fillRect(0, 0, pageW, pageH, '#0a0e1a');
-    drawHeader(2, 'MOBILITY TRENDS & VEHICLE COMPARISON');
+        // Track
+        fillRect(bx, vBarTop, barWidth, vPlotH, '#1f293d');
+        // Bar
+        fillRect(bx, by, barWidth, bHeight, cat.color);
 
-    y = 33;
+        // Value & Percent above bar
+        setFont('bold', 5.8, '#FFFFFF');
+        text(cat.count.toLocaleString(), bx + barWidth / 2, by - 4, { align: 'center' });
+        setFont('bold', 5.2, cat.color);
+        text(`${cat.pct}%`, bx + barWidth / 2, by - 1, { align: 'center' });
 
-    // Section 4: 24-Hour Mobility Flow Trend (Vector Line Chart)
-    fillRect(margin, y, contentW, 6, '#1e3a8a');
-    fillRect(margin, y, 3, 6, '#00f0ff');
-    setFont('bold', 7.5, '#7dd3fc');
-    text('  24-HOUR AUDIENCE MOBILITY FLOW TREND (LINE CHART)', margin + 3.5, y + 4.2);
-    y += 8.5;
+        // Label below bar
+        setFont('bold', 6, '#cbd5e1');
+        text(cat.name, bx + barWidth / 2, vBarBottom + 5, { align: 'center' });
+      });
 
-    const lineChartH = 68;
-    fillRect(margin, y, contentW, lineChartH, '#111827');
-    fillRect(margin, y, contentW, 1, '#1e293b');
+      y += barChartH + 7;
 
-    const hourlyTrendData = [
-      { label: '06 AM', val: Math.round(flowV * 0.35) },
-      { label: '08 AM', val: Math.round(flowV * 0.82) },
-      { label: '10 AM', val: Math.round(flowV * 0.95) },
-      { label: '12 PM', val: Math.round(flowV * 0.74) },
-      { label: '02 PM', val: Math.round(flowV * 0.68) },
-      { label: '04 PM', val: Math.round(flowV * 0.88) },
-      { label: '06 PM', val: Math.round(flowV * 1.15) },
-      { label: '08 PM', val: Math.round(flowV * 0.92) },
-      { label: '10 PM', val: Math.round(flowV * 0.45) }
-    ];
+      // Section 6: Corridor Mobility Matrix Table
+      fillRect(margin, y, contentW, 6, '#1e293b');
+      fillRect(margin, y, 3, 6, '#64748b');
+      setFont('bold', 7.5, '#cbd5e1');
+      text('  CORRIDOR MOBILITY & SPEED MATRIX', margin + 3.5, y + 4.2);
+      y += 8;
 
-    const chartLeft = margin + 22;
-    const chartRight = margin + contentW - 14;
-    const chartTop = y + 10;
-    const chartBottom = y + lineChartH - 15;
-    const plotW = chartRight - chartLeft;
-    const plotH = chartBottom - chartTop;
-
-    const maxLineVal = Math.max(...hourlyTrendData.map(d => d.val)) * 1.15 || 120;
-
-    // Gridlines
-    const gridSteps = 4;
-    for (let i = 0; i <= gridSteps; i++) {
-      const gy = chartBottom - (i / gridSteps) * plotH;
-      const gVal = Math.round((i / gridSteps) * maxLineVal);
-      doc.setDrawColor(...hex('rgba(255, 255, 255, 0.08)'));
-      doc.setLineWidth(0.2);
-      doc.line(chartLeft, gy, chartRight, gy);
-
-      setFont('normal', 5.6, '#64748b');
-      text(`${gVal} /min`, chartLeft - 2.5, gy + 1.2, { align: 'right' });
-    }
-
-    // Coordinates
-    const coords = hourlyTrendData.map((pt, idx) => {
-      const px = chartLeft + (idx / (hourlyTrendData.length - 1)) * plotW;
-      const py = chartBottom - (pt.val / maxLineVal) * plotH;
-      return { x: px, y: py, ...pt };
-    });
-
-    // Shaded area underneath line
-    for (let i = 0; i < coords.length - 1; i++) {
-      const p1 = coords[i];
-      const p2 = coords[i + 1];
-      doc.setFillColor(...hex('#0d253f'));
-      doc.triangle(p1.x, p1.y, p2.x, p2.y, p1.x, chartBottom, 'F');
-      doc.triangle(p2.x, p2.y, p2.x, chartBottom, p1.x, chartBottom, 'F');
-    }
-
-    // Main line
-    doc.setDrawColor(...hex('#00F0FF'));
-    doc.setLineWidth(0.8);
-    for (let i = 0; i < coords.length - 1; i++) {
-      doc.line(coords[i].x, coords[i].y, coords[i + 1].x, coords[i + 1].y);
-    }
-
-    // Dots & Labels
-    coords.forEach((pt) => {
-      doc.setFillColor(...hex('#00F0FF'));
-      doc.circle(pt.x, pt.y, 1.3, 'F');
-      doc.setFillColor(...hex('#FFFFFF'));
-      doc.circle(pt.x, pt.y, 0.6, 'F');
-
-      setFont('normal', 5.8, '#94a3b8');
-      text(pt.label, pt.x, chartBottom + 5.5, { align: 'center' });
-    });
-
-    // Peak callout badge
-    const peakCoord = coords.reduce((max, pt) => pt.val > max.val ? pt : max, coords[0]);
-    if (peakCoord) {
-      fillRect(peakCoord.x - 16, peakCoord.y - 7.5, 32, 5.5, '#1e3a8a');
-      doc.setDrawColor(...hex('#38bdf8'));
-      doc.setLineWidth(0.3);
-      doc.rect(peakCoord.x - 16, peakCoord.y - 7.5, 32, 5.5, 'D');
-      setFont('bold', 5.5, '#38bdf8');
-      text(`Peak: ${peakCoord.val} veh/min`, peakCoord.x, peakCoord.y - 3.8, { align: 'center' });
-    }
-
-    y += lineChartH + 7;
-
-    // Section 5: Vehicle Category Comparison (Vertical Bar Chart)
-    fillRect(margin, y, contentW, 6, '#1a1a2e');
-    fillRect(margin, y, 3, 6, '#f59e0b');
-    setFont('bold', 7.5, '#fcd34d');
-    text('  VEHICLE CATEGORY COMPARISON (VERTICAL BAR CHART)', margin + 3.5, y + 4.2);
-    y += 8.5;
-
-    const barChartH = 68;
-    fillRect(margin, y, contentW, barChartH, '#111827');
-    fillRect(margin, y, contentW, 1, '#1e293b');
-
-    const vBarLeft = margin + 14;
-    const vBarRight = margin + contentW - 14;
-    const vBarTop = y + 12;
-    const vBarBottom = y + barChartH - 16;
-    const vPlotW = vBarRight - vBarLeft;
-    const vPlotH = vBarBottom - vBarTop;
-
-    const maxBarCount = Math.max(...categories.map(c => c.count)) * 1.1 || 1000;
-
-    // Baseline
-    doc.setDrawColor(...hex('rgba(255, 255, 255, 0.15)'));
-    doc.setLineWidth(0.4);
-    doc.line(vBarLeft, vBarBottom, vBarRight, vBarBottom);
-
-    const slotW = vPlotW / categories.length;
-    const barWidth = Math.min(18, slotW * 0.55);
-
-    categories.forEach((cat, idx) => {
-      const bx = vBarLeft + idx * slotW + (slotW - barWidth) / 2;
-      const bHeight = Math.max(3, (cat.count / maxBarCount) * vPlotH);
-      const by = vBarBottom - bHeight;
-
-      // Track
-      fillRect(bx, vBarTop, barWidth, vPlotH, '#1f293d');
-      // Bar
-      fillRect(bx, by, barWidth, bHeight, cat.color);
-
-      // Value & Percent above bar
-      setFont('bold', 5.8, '#FFFFFF');
-      text(cat.count.toLocaleString(), bx + barWidth / 2, by - 4, { align: 'center' });
-      setFont('bold', 5.2, cat.color);
-      text(`${cat.pct}%`, bx + barWidth / 2, by - 1, { align: 'center' });
-
-      // Label below bar
-      setFont('bold', 6, '#cbd5e1');
-      text(cat.name, bx + barWidth / 2, vBarBottom + 5, { align: 'center' });
-    });
-
-    y += barChartH + 7;
-
-    // Section 6: Corridor Mobility Matrix Table
-    fillRect(margin, y, contentW, 6, '#1e293b');
-    fillRect(margin, y, 3, 6, '#64748b');
-    setFont('bold', 7.5, '#cbd5e1');
-    text('  CORRIDOR MOBILITY & SPEED MATRIX', margin + 3.5, y + 4.2);
-    y += 8;
-
-    // Table Header
-    fillRect(margin, y, contentW, 5.5, '#1e293b');
-    setFont('bold', 6.2, '#94a3b8');
-    text('CORRIDOR DESCRIPTION', margin + 3, y + 3.8);
-    text('AVG SPEED', margin + 65, y + 3.8);
-    text('FLOW DENSITY', margin + 95, y + 3.8);
-    text('AVG DWELL', margin + 130, y + 3.8);
-    text('CONGESTION LEVEL', margin + 155, y + 3.8);
-    y += 6.5;
-
-    const corridors = [
-      { name: `${landmark} Main Arterial (Northbound)`, speed: '42 km/h', flow: `${Math.round(flowV * 12)} veh/hr`, dwell: `${dwellV}s`, status: 'Low Congestion', color: '#10b981' },
-      { name: `${landmark} Flyover Connector (Eastbound)`, speed: '28 km/h', flow: `${Math.round(flowV * 18)} veh/hr`, dwell: `${(dwellV * 1.4).toFixed(1)}s`, status: 'Moderate', color: '#f59e0b' },
-      { name: `${landmark} Junction Rotary (Southbound)`, speed: '14 km/h', flow: `${Math.round(flowV * 24)} veh/hr`, dwell: `${(dwellV * 2.2).toFixed(1)}s`, status: 'High Exposure', color: '#38bdf8' }
-    ];
-
-    corridors.forEach((corr, i) => {
-      const rowBg = i % 2 === 0 ? '#0f172a' : '#111827';
-      fillRect(margin, y, contentW, 7, rowBg);
-      setFont('bold', 6.5, '#FFFFFF');
-      text(corr.name, margin + 3, y + 4.5);
-      setFont('normal', 6.5, '#94a3b8');
-      text(corr.speed, margin + 65, y + 4.5);
-      text(corr.flow, margin + 95, y + 4.5);
-      text(corr.dwell, margin + 130, y + 4.5);
-      setFont('bold', 6.5, corr.color);
-      text(corr.status, margin + 155, y + 4.5);
-      y += 7.5;
-    });
-
-    drawFooter(2);
-
-    // ══════════════════════════════════════════════════════════
-    // PAGE 3: AUDIENCE ROI VALUATION & TELEMETRY AUDIT
-    // ══════════════════════════════════════════════════════════
-    doc.addPage();
-    fillRect(0, 0, pageW, pageH, '#0a0e1a');
-    drawHeader(3, 'CAMPAIGN ROI & TELEMETRY AUDIT');
-
-    y = 33;
-
-    // Section 7: Campaign ROI & Media Valuation Analysis
-    fillRect(margin, y, contentW, 6, '#2a1708');
-    fillRect(margin, y, 3, 6, '#f97316');
-    setFont('bold', 7.5, '#fdba74');
-    text('  CAMPAIGN ROI & MEDIA VALUATION IMPACT', margin + 3.5, y + 4.2);
-    y += 8.5;
-
-    const roiBoxes = [
-      { label: 'VERIFIED IMPRESSIONS', val: reachV.toLocaleString(), sub: 'Dual Camera Neural Count', col: '#fdba74' },
-      { label: 'EFFECTIVE CPM (eCPM)', val: 'Rs. 48.50 ($0.58)', sub: 'Benchmark: Rs. 62.00', col: '#38bdf8' },
-      { label: 'ATTENTION MULTIPLIER', val: '4.8x Benchmark', sub: `${dwellV}s Exposure Window`, col: '#10b981' },
-      { label: 'ESTIMATED MEDIA VALUE', val: `Rs. ${(Math.round(reachV * 0.78)).toLocaleString()}`, sub: 'Net Campaign Equity', col: '#f59e0b' }
-    ];
-
-    roiBoxes.forEach((box, idx) => {
-      const bx = margin + idx * (cardW + 3.5);
-      fillRect(bx, y, cardW, 19, '#111827');
-      fillRect(bx, y, cardW, 1.2, box.col);
-      setFont('bold', 5.6, '#94a3b8');
-      text(box.label, bx + 3, y + 4.5);
-      setFont('bold', 9, box.col);
-      text(box.val, bx + 3, y + 11.5);
-      setFont('normal', 5.6, '#64748b');
-      text(box.sub, bx + 3, y + 16);
-    });
-    y += 24;
-
-    // ROI Conversion Deep Dive
-    fillRect(margin, y, contentW, 22, '#0f172a');
-    fillRect(margin, y, contentW, 1, '#1e293b');
-    setFont('bold', 7, '#FFFFFF');
-    text('ROI Conversion Analytics:', margin + 3.5, y + 5);
-    setFont('normal', 6.8, '#cbd5e1');
-    text(`• By converting high vehicular density (${flowV} veh/min) and ${highEndPct}% premium audience concentration into quantifiable impressions,`, margin + 3.5, y + 10);
-    text(`  this media asset delivers a proven 3.8x ROI multiplier relative to unverified static inventory.`, margin + 3.5, y + 14.5);
-    text(`• Advertiser campaigns deployed on this screen achieve guaranteed visibility during peak commuting windows with validated exposure tracking.`, margin + 3.5, y + 19);
-    y += 27;
-
-    // Section 8: Sensor Node & AI Verification Audit Metadata
-    fillRect(margin, y, contentW, 6, '#1e293b');
-    fillRect(margin, y, 3, 6, '#38bdf8');
-    setFont('bold', 7.5, '#7dd3fc');
-    text('  SENSOR NODE & AI VERIFICATION AUDIT METADATA', margin + 3.5, y + 4.2);
-    y += 8.5;
-
-    fillRect(margin, y, contentW, 46, '#111827');
-    fillRect(margin, y, contentW, 1, '#1e293b');
-
-    const auditGrid = [
-      ['Billboard Asset Code', bbCode, 'Front Camera Node', selectedBillboard?.camera_ff_code || 'CAM-FF-004'],
-      ['Edge Processor Unit', `${radxaId} (Radxa Neural Box)`, 'Camera Resolution & FPS', '1080p FHD @ 30 FPS Stream'],
-      ['GPS Geo-Coordinates', `${(selectedBillboard?.latitude || 12.9010).toFixed(4)}° N, ${(selectedBillboard?.longitude || 80.2279).toFixed(4)}° E`, 'Detection Accuracy', '98.7% (Dual Neural Inference)'],
-      ['Database Sync Timestamp', dateStr, 'Cryptographic Audit Hash', 'SHA-256: 7f8a9c2e4b1d09aa8e45']
-    ];
-
-    let auditY = y + 4.5;
-    auditGrid.forEach((row) => {
+      // Table Header
+      fillRect(margin, y, contentW, 5.5, '#1e293b');
       setFont('bold', 6.2, '#94a3b8');
-      text(row[0] + ':', margin + 4, auditY);
-      setFont('normal', 6.5, '#FFFFFF');
-      text(row[1], margin + 38, auditY);
+      text('CORRIDOR DESCRIPTION', margin + 3, y + 3.8);
+      text('AVG SPEED', margin + 65, y + 3.8);
+      text('FLOW DENSITY', margin + 95, y + 3.8);
+      text('AVG DWELL', margin + 130, y + 3.8);
+      text('CONGESTION LEVEL', margin + 155, y + 3.8);
+      y += 6.5;
 
-      setFont('bold', 6.2, '#94a3b8');
-      text(row[2] + ':', margin + 95, auditY);
-      setFont('normal', 6.5, '#38bdf8');
-      text(row[3], margin + 135, auditY);
+      const corridors = [
+        { name: `${landmark} Main Arterial (Northbound)`, speed: '42 km/h', flow: `${Math.round(flowV * 12)} veh/hr`, dwell: `${dwellV}s`, status: 'Low Congestion', color: '#10b981' },
+        { name: `${landmark} Flyover Connector (Eastbound)`, speed: '28 km/h', flow: `${Math.round(flowV * 18)} veh/hr`, dwell: `${(dwellV * 1.4).toFixed(1)}s`, status: 'Moderate', color: '#f59e0b' },
+        { name: `${landmark} Junction Rotary (Southbound)`, speed: '14 km/h', flow: `${Math.round(flowV * 24)} veh/hr`, dwell: `${(dwellV * 2.2).toFixed(1)}s`, status: 'High Exposure', color: '#38bdf8' }
+      ];
 
-      auditY += 9.5;
-    });
+      corridors.forEach((corr, i) => {
+        const rowBg = i % 2 === 0 ? '#0f172a' : '#111827';
+        fillRect(margin, y, contentW, 7, rowBg);
+        setFont('bold', 6.5, '#FFFFFF');
+        text(corr.name, margin + 3, y + 4.5);
+        setFont('normal', 6.5, '#94a3b8');
+        text(corr.speed, margin + 65, y + 4.5);
+        text(corr.flow, margin + 95, y + 4.5);
+        text(corr.dwell, margin + 130, y + 4.5);
+        setFont('bold', 6.5, corr.color);
+        text(corr.status, margin + 155, y + 4.5);
+        y += 7.5;
+      });
 
-    y += 52;
+      drawFooter(2);
 
-    // Section 9: Strategic Recommendations for Media Buyers
-    fillRect(margin, y, contentW, 6, '#0f291e');
-    fillRect(margin, y, 3, 6, '#10b981');
-    setFont('bold', 7.5, '#6ee7b7');
-    text('  STRATEGIC RECOMMENDATIONS FOR MEDIA BUYERS', margin + 3.5, y + 4.2);
-    y += 8.5;
+      // ══════════════════════════════════════════════════════════
+      // PAGE 3: AUDIENCE ROI VALUATION & TELEMETRY AUDIT
+      // ══════════════════════════════════════════════════════════
+      doc.addPage();
+      fillRect(0, 0, pageW, pageH, '#0a0e1a');
+      drawHeader(3, 'CAMPAIGN ROI & TELEMETRY AUDIT');
 
-    fillRect(margin, y, contentW, 28, '#0f172a');
-    fillRect(margin, y, contentW, 1, '#1e293b');
-    setFont('normal', 6.8, '#cbd5e1');
-    text(`1. Peak Scheduling: Schedule high-impact 15-second creative spots during ${peakHourStr} to capture maximum flow.`, margin + 3.5, y + 5.5);
-    text(`2. Luxury Brand Targeting: Premium and luxury vehicles represent ${highEndPct}% of total volume; ideal for automotive, real estate, and finance.`, margin + 3.5, y + 10.5);
-    text(`3. Creative Optimization: With an average dwell of ${dwellV}s, use bold high-contrast visuals with clear call-to-actions to maximize recall.`, margin + 3.5, y + 15.5);
-    text(`4. Verification Assurance: Telemetry is continuously recorded by on-site Radxa neural hardware with 100% audit integrity.`, margin + 3.5, y + 20.5);
+      y = 33;
 
-    drawFooter(3);
+      // Section 7: Campaign ROI & Media Valuation Analysis
+      fillRect(margin, y, contentW, 6, '#2a1708');
+      fillRect(margin, y, 3, 6, '#f97316');
+      setFont('bold', 7.5, '#fdba74');
+      text('  CAMPAIGN ROI & MEDIA VALUATION IMPACT', margin + 3.5, y + 4.2);
+      y += 8.5;
 
-    doc.save(`Aculion_${rep.id}_Audience_Mobility_Report.pdf`);
+      const roiBoxes = [
+        { label: 'VERIFIED IMPRESSIONS', val: reachV.toLocaleString(), sub: 'Dual Camera Neural Count', col: '#fdba74' },
+        { label: 'EFFECTIVE CPM (eCPM)', val: 'Rs. 48.50 ($0.58)', sub: 'Benchmark: Rs. 62.00', col: '#38bdf8' },
+        { label: 'ATTENTION MULTIPLIER', val: '4.8x Benchmark', sub: `${dwellV}s Exposure Window`, col: '#10b981' },
+        { label: 'ESTIMATED MEDIA VALUE', val: `Rs. ${(Math.round(reachV * 0.78)).toLocaleString()}`, sub: 'Net Campaign Equity', col: '#f59e0b' }
+      ];
+
+      roiBoxes.forEach((box, idx) => {
+        const bx = margin + idx * (cardW + 3.5);
+        fillRect(bx, y, cardW, 19, '#111827');
+        fillRect(bx, y, cardW, 1.2, box.col);
+        setFont('bold', 5.6, '#94a3b8');
+        text(box.label, bx + 3, y + 4.5);
+        setFont('bold', 9, box.col);
+        text(box.val, bx + 3, y + 11.5);
+        setFont('normal', 5.6, '#64748b');
+        text(box.sub, bx + 3, y + 16);
+      });
+      y += 24;
+
+      // ROI Conversion Deep Dive
+      fillRect(margin, y, contentW, 22, '#0f172a');
+      fillRect(margin, y, contentW, 1, '#1e293b');
+      setFont('bold', 7, '#FFFFFF');
+      text('ROI Conversion Analytics:', margin + 3.5, y + 5);
+      setFont('normal', 6.8, '#cbd5e1');
+      text(`• By converting high vehicular density (${flowV} veh/min) and ${highEndPct}% premium audience concentration into quantifiable impressions,`, margin + 3.5, y + 10);
+      text(`  this media asset delivers a proven 3.8x ROI multiplier relative to unverified static inventory.`, margin + 3.5, y + 14.5);
+      text(`• Advertiser campaigns deployed on this screen achieve guaranteed visibility during peak commuting windows with validated exposure tracking.`, margin + 3.5, y + 19);
+      y += 27;
+
+      // Section 8: Sensor Node & AI Verification Audit Metadata
+      fillRect(margin, y, contentW, 6, '#1e293b');
+      fillRect(margin, y, 3, 6, '#38bdf8');
+      setFont('bold', 7.5, '#7dd3fc');
+      text('  SENSOR NODE & AI VERIFICATION AUDIT METADATA', margin + 3.5, y + 4.2);
+      y += 8.5;
+
+      fillRect(margin, y, contentW, 46, '#111827');
+      fillRect(margin, y, contentW, 1, '#1e293b');
+
+      const auditGrid = [
+        ['Billboard Asset Code', bbCode, 'Front Camera Node', selectedBillboard?.camera_ff_code || 'CAM-FF-004'],
+        ['Edge Processor Unit', `${radxaId} (Radxa Neural Box)`, 'Camera Resolution & FPS', '1080p FHD @ 30 FPS Stream'],
+        ['GPS Geo-Coordinates', `${(selectedBillboard?.latitude || 12.9010).toFixed(4)}° N, ${(selectedBillboard?.longitude || 80.2279).toFixed(4)}° E`, 'Detection Accuracy', '98.7% (Dual Neural Inference)'],
+        ['Database Sync Timestamp', dateStr, 'Cryptographic Audit Hash', 'SHA-256: 7f8a9c2e4b1d09aa8e45']
+      ];
+
+      let auditY = y + 4.5;
+      auditGrid.forEach((row) => {
+        setFont('bold', 6.2, '#94a3b8');
+        text(row[0] + ':', margin + 4, auditY);
+        setFont('normal', 6.5, '#FFFFFF');
+        text(row[1], margin + 38, auditY);
+
+        setFont('bold', 6.2, '#94a3b8');
+        text(row[2] + ':', margin + 95, auditY);
+        setFont('normal', 6.5, '#38bdf8');
+        text(row[3], margin + 135, auditY);
+
+        auditY += 9.5;
+      });
+
+      y += 52;
+
+      // Section 9: Strategic Recommendations for Media Buyers
+      fillRect(margin, y, contentW, 6, '#0f291e');
+      fillRect(margin, y, 3, 6, '#10b981');
+      setFont('bold', 7.5, '#6ee7b7');
+      text('  STRATEGIC RECOMMENDATIONS FOR MEDIA BUYERS', margin + 3.5, y + 4.2);
+      y += 8.5;
+
+      fillRect(margin, y, contentW, 28, '#0f172a');
+      fillRect(margin, y, contentW, 1, '#1e293b');
+      setFont('normal', 6.8, '#cbd5e1');
+      text(`1. Peak Scheduling: Schedule high-impact 15-second creative spots during ${peakHourStr} to capture maximum flow.`, margin + 3.5, y + 5.5);
+      text(`2. Luxury Brand Targeting: Premium and luxury vehicles represent ${highEndPct}% of total volume; ideal for automotive, real estate, and finance.`, margin + 3.5, y + 10.5);
+      text(`3. Creative Optimization: With an average dwell of ${dwellV}s, use bold high-contrast visuals with clear call-to-actions to maximize recall.`, margin + 3.5, y + 15.5);
+      text(`4. Verification Assurance: Telemetry is continuously recorded by on-site Radxa neural hardware with 100% audit integrity.`, margin + 3.5, y + 20.5);
+
+      drawFooter(3);
+
+      const fileName = `Aculion_${reportId}_Audience_Mobility_Report.pdf`;
+      try {
+        doc.save(fileName);
+      } catch (saveErr) {
+        console.warn("doc.save() failed, attempting anchor click fallback:", saveErr);
+        const blob = doc.output('blob');
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 3000);
+      }
+    } catch (globalPdfErr) {
+      console.error("Critical error inside downloadReportAsPDF:", globalPdfErr);
+      alert("Failed to generate report PDF. Please check the console for details.");
+    }
   };
 
 
@@ -2124,7 +2178,7 @@ export default function LiveDashboard({
                       <div className="flex flex-col gap-1">
                         <label className="text-[10px] text-white/50">Streams check list</label>
                         <div className="flex flex-col gap-1.5 text-[10px] mt-1 font-sans">
-                          {['Footfall & Impression counts', 'Average Dwell Duration', 'Vehicular Speed & Traffic count', 'Occupancy & Pricing modifier'].map(lbl => (
+                          {['Footfall & Impression counts', 'Average Dwell Duration', 'Vehicular Speed & Movement Flow', 'Occupancy & Pricing modifier'].map(lbl => (
                             <label key={lbl} className="flex items-center gap-2 cursor-pointer text-white/70 hover:text-white">
                               <input type="checkbox" defaultChecked className="rounded border-white/10 bg-slate-800 w-3 h-3 cursor-pointer" />
                               <span>{lbl}</span>
