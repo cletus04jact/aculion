@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+
+const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || "http://localhost:8080";
 import { Link } from "react-router-dom";
 import { useTheme } from "../../providers";
 import {
@@ -56,7 +58,7 @@ export default function Header({
     const lng = parseFloat(lngVal);
     if (!isNaN(lat) && !isNaN(lng)) {
       const delayDebounce = setTimeout(() => {
-        axios.get("http://127.0.0.1:8000/api/v1/area/detect", {
+        axios.get(`${API_BASE}/api/location/v1/area/detect`, {
           params: { latitude: lat, longitude: lng }
         }).then(res => {
           setDetectedArea(res.data.area);
@@ -85,7 +87,7 @@ export default function Header({
     // If a different area search name was typed by the user, geocode it first!
     if (areaSearch && areaSearch !== detectedArea && areaSearch !== area) {
       try {
-        const res = await axios.get("http://127.0.0.1:8000/api/v1/geocode", {
+        const res = await axios.get(`${API_BASE}/api/location/v1/geocode`, {
           params: { q: areaSearch }
         });
         const { latitude: newLat, longitude: newLng } = res.data;

@@ -306,34 +306,25 @@ export default function App() {
   const [billboards, setBillboards] = useState([]);
   const [selectedBillboard, setSelectedBillboard] = useState(null);
 
-  // Fetch billboards via billboard service when user logs in or mounts
+  // Fetch billboards via billboard service on mount and when user session changes
   useEffect(() => {
-    if (isLoggedIn) {
-      billboardService.getBillboards().then((rows) => {
-        if (rows) {
-          setBillboards(rows);
-          if (rows.length > 0) {
-            // Find if there is a billboard code in the current URL path
-            const dashMatch = window.location.pathname.match(/^\/([^/]+)\/([^/]+)\/dashboard(?:\/[^/]*)?$/);
-            const urlBbCode = dashMatch ? dashMatch[2] : null;
-            const urlBillboard = urlBbCode ? rows.find(b => (b.billboard_code === urlBbCode || b.id === urlBbCode)) : null;
+    billboardService.getBillboards().then((rows) => {
+      if (rows && rows.length > 0) {
+        setBillboards(rows);
+        // Find if there is a billboard code in the current URL path
+        const dashMatch = window.location.pathname.match(/^\/([^/]+)\/([^/]+)\/dashboard(?:\/[^/]*)?$/);
+        const urlBbCode = dashMatch ? dashMatch[2] : null;
+        const urlBillboard = urlBbCode ? rows.find(b => (b.billboard_code === urlBbCode || b.id === urlBbCode)) : null;
 
-            setSelectedBillboard((prev) => {
-              if (urlBillboard) return urlBillboard;
-              const stillExists = prev && rows.find(b => b.id === prev.id);
-              return stillExists ? prev : rows[0];
-            });
-          } else {
-            setSelectedBillboard(null);
-          }
-        }
-      }).catch((err) => {
-        console.error('[App] Billboard fetch error:', err);
-      });
-    } else {
-      setBillboards([]);
-      setSelectedBillboard(null);
-    }
+        setSelectedBillboard((prev) => {
+          if (urlBillboard) return urlBillboard;
+          const stillExists = prev && rows.find(b => (b.billboard_code || b.id) === (prev.billboard_code || prev.id));
+          return stillExists ? prev : rows[0];
+        });
+      }
+    }).catch((err) => {
+      console.error('[App] Billboard fetch error:', err);
+    });
   }, [isLoggedIn, user?.email]);
 
   // ── URL helpers ──────────────────────────────────────────
@@ -354,7 +345,7 @@ export default function App() {
     localStorage.setItem('aculion_selected_billboard', JSON.stringify(billboard));
     const slug   = getUserSlug(user);
     const bbCode = billboard.billboard_code || billboard.id || 'bb';
-    const path   = `/${slug}/${bbCode}/dashboard/live-view`;
+    const path   = `/${slug}/${bbCode}/dashboard/audience-intelligence`;
     window.history.pushState(null, '', path);
     setRoute(path);
   };

@@ -1,7 +1,7 @@
 import axios from "axios";
 import { LocationAnalytics } from "@/types";
 
-const API_BASE = "http://127.0.0.1:8001";
+const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || "http://localhost:8080";
 const TIMEOUT_MS = 30000;
 
 // ---------------------------------------------------------------------------
@@ -22,7 +22,7 @@ export const locationService = {
     radius: number,
     _billboardId?: string
   ): Promise<LocationAnalytics> => {
-    const response = await axios.get(`${API_BASE}/api/v1/analyze`, {
+    const response = await axios.get(`${API_BASE}/api/location/v1/analyze`, {
       params: { latitude, longitude, radius },
       timeout: TIMEOUT_MS,
     });

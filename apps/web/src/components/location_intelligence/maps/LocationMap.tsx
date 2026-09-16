@@ -7,10 +7,12 @@ import { ZoomIn, ZoomOut, Maximize2, Layers } from "lucide-react";
 // ---------------------------------------------------------------------------
 // Tile URL helpers
 // ---------------------------------------------------------------------------
+const CARTO_KEY = (import.meta as any).env?.VITE_CARTO_API_KEY || "";
+
 const TILE_URLS: Record<string, string> = {
   satellite: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-  dark:      "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-  light:     "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+  dark: `https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key=${CARTO_KEY}`,
+  light: `https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key=${CARTO_KEY}`,
 };
 
 interface LocationMapProps {
@@ -49,10 +51,10 @@ export default function LocationMap({
 
   // Category layer visibility
   const [layerViz, setLayerViz] = useState({
-    pois:    true,
+    pois: true,
     heatmap: true,
     transit: true,
-    radius:  true,
+    radius: true,
     markers: true,
     billboards: true,
   });
@@ -95,6 +97,43 @@ export default function LocationMap({
     };
   }, []);
 
+  // ── Sync callback Ref to prevent stale closures ──
+  const onLocationPickedRef = useRef(onLocationPicked);
+  useEffect(() => {
+    onLocationPickedRef.current = onLocationPicked;
+  }, [onLocationPicked]);
+
+  const isMapPickingActiveRef = useRef(isMapPickingActive);
+  useEffect(() => {
+    isMapPickingActiveRef.current = isMapPickingActive;
+  }, [isMapPickingActive]);
+
+  // ── Dom Click Capture for Location Picking (Capture Phase) ──
+  useEffect(() => {
+    if (!leafletReady || !mapRef.current || !mapContainerRef.current) return;
+    const container = mapContainerRef.current;
+
+    const handleDomClick = (e: MouseEvent) => {
+      if (!isMapPickingActiveRef.current) return;
+
+      const map = mapRef.current;
+      const latlng = map.mouseEventToLatLng(e);
+      console.log("DOM Click captured in pick mode:", latlng.lat, latlng.lng);
+
+      e.stopPropagation();
+      e.preventDefault();
+
+      if (typeof onLocationPickedRef.current === "function") {
+        onLocationPickedRef.current(latlng.lat, latlng.lng);
+      }
+    };
+
+    container.addEventListener("click", handleDomClick, true);
+    return () => {
+      container.removeEventListener("click", handleDomClick, true);
+    };
+  }, [leafletReady]);
+
   // ── Initialise Map ──
   useEffect(() => {
     if (!leafletReady || !L || !mapContainerRef.current || mapRef.current) return;
@@ -108,37 +147,35 @@ export default function LocationMap({
     mapRef.current = map;
 
     // Default tile
-    layersRef.current.tile = L.tileLayer(TILE_URLS.dark, { maxZoom: 19 }).addTo(map);
+    layersRef.current.tile = L.tileLayer(TILE_URLS.dark, { subdomains: "abcd", maxZoom: 20 }).addTo(map);
 
     // Layer groups
-    layersRef.current.poiGroup     = L.layerGroup().addTo(map);
-    layersRef.current.heatGroup    = L.layerGroup().addTo(map);
+    layersRef.current.poiGroup = L.layerGroup().addTo(map);
+    layersRef.current.heatGroup = L.layerGroup().addTo(map);
     layersRef.current.transitGroup = L.layerGroup().addTo(map);
-    layersRef.current.radiusGroup  = L.layerGroup().addTo(map);
-    layersRef.current.markerGroup  = L.layerGroup().addTo(map);
+    layersRef.current.radiusGroup = L.layerGroup().addTo(map);
+    layersRef.current.markerGroup = L.layerGroup().addTo(map);
     layersRef.current.billboardGroup = L.layerGroup().addTo(map);
+
+    // Click handler for candidate picking (using Ref to avoid stale closure issues)
+    map.on("click", (e: any) => {
+      console.log("Map clicked inside Leaflet:", e.latlng.lat, e.latlng.lng);
+      if (!isMapPickingActiveRef.current) {
+        console.log("Map picking is NOT active. Click ignored.");
+        return;
+      }
+      if (typeof onLocationPickedRef.current === "function") {
+        onLocationPickedRef.current(e.latlng.lat, e.latlng.lng);
+      } else {
+        console.warn("onLocationPickedRef.current is not a function:", onLocationPickedRef.current);
+      }
+    });
 
     return () => {
       if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leafletReady]);
-
-  // ── Click handler for candidate picking ──
-  useEffect(() => {
-    if (!leafletReady || !mapRef.current || !L) return;
-    const map = mapRef.current;
-
-    const onClick = (e: any) => {
-      if (!isMapPickingActive) return;
-      onLocationPicked(e.latlng.lat, e.latlng.lng);
-    };
-
-    map.on("click", onClick);
-    return () => {
-      map.off("click", onClick);
-    };
-  }, [leafletReady, L, isMapPickingActive, onLocationPicked]);
 
   // ── Force Invalidate Size after leaflet initialization finishes ──
   useEffect(() => {
@@ -155,18 +192,18 @@ export default function LocationMap({
     if (layersRef.current.tile) {
       mapRef.current.removeLayer(layersRef.current.tile);
     }
-    layersRef.current.tile = L.tileLayer(TILE_URLS[mapType], { maxZoom: 19 }).addTo(mapRef.current);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    layersRef.current.tile = L.tileLayer(TILE_URLS[mapType], { subdomains: "abcd", maxZoom: 20 }).addTo(mapRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapType, leafletReady]);
 
   // ── Layer Visibility Toggle ──
   useEffect(() => {
     if (!mapRef.current || !L) return;
     const groups: Record<string, string> = {
-      pois:    "poiGroup",
+      pois: "poiGroup",
       heatmap: "heatGroup",
       transit: "transitGroup",
-      radius:  "radiusGroup",
+      radius: "radiusGroup",
       markers: "markerGroup",
       billboards: "billboardGroup",
     };
@@ -179,14 +216,24 @@ export default function LocationMap({
         if (mapRef.current.hasLayer(group)) mapRef.current.removeLayer(group);
       }
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layerViz, leafletReady]);
+
+  // ── Center map view only when the finalized analyzed coordinates change ──
+  useEffect(() => {
+    if (!leafletReady || !mapRef.current) return;
+    mapRef.current.setView([latitude, longitude], mapRef.current.getZoom(), { animate: true });
+  }, [latitude, longitude, leafletReady]);
 
   // ── Main Update Effect ──
   useEffect(() => {
     if (!mapRef.current || !L) return;
     const map = mapRef.current;
-    
+
+    const targetLat = selectedLat || latitude;
+    const targetLng = selectedLng || longitude;
+    console.log("LocationMap update effect: targetLat=", targetLat, "targetLng=", targetLng, "selectedLat=", selectedLat, "latitude=", latitude);
+
     // Force Leaflet to recalculate size asynchronously to prevent paint loops or freezes
     setTimeout(() => {
       if (mapRef.current) {
@@ -194,16 +241,12 @@ export default function LocationMap({
       }
     }, 0);
 
-    const targetLat = selectedLat || latitude;
-    const targetLng = selectedLng || longitude;
-    map.setView([targetLat, targetLng], map.getZoom(), { animate: true });
-
     // ── Markers ──
     layersRef.current.markerGroup?.clearLayers();
 
     // Blue candidate marker
     const blueIcon = L.divIcon({
-      className: "",
+      className: "bg-transparent border-0",
       html: `
         <div class="blue-picker-pin" style="
           position: relative;
@@ -233,7 +276,7 @@ export default function LocationMap({
 
     // Billboard marker icon using the custom image
     const redBillboardIcon = L.divIcon({
-      className: "",
+      className: "bg-transparent border-0",
       html: `
         <div style="
           position: relative;
@@ -256,8 +299,8 @@ export default function LocationMap({
 
     (billboards || []).forEach((bb) => {
       if (!bb.latitude || !bb.longitude) return;
-      
-      const campaignHtml = bb.campaign 
+
+      const campaignHtml = bb.campaign
         ? `
           <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 10px;">
             <div style="font-weight: 700; color: #3b82f6;">Campaign: ${bb.campaign.name}</div>
@@ -266,16 +309,14 @@ export default function LocationMap({
               <span style="
                 padding: 1px 5px; 
                 border-radius: 4px; 
-                background: ${
-                  bb.campaign.status === "Running" ? "rgba(16, 185, 129, 0.15)" :
-                  bb.campaign.status === "Upcoming" ? "rgba(245, 158, 11, 0.15)" :
-                  "rgba(148, 163, 184, 0.15)"
-                };
-                color: ${
-                  bb.campaign.status === "Running" ? "#34d399" :
-                  bb.campaign.status === "Upcoming" ? "#fbbf24" :
-                  "#94a3b8"
-                };
+                background: ${bb.campaign.status === "Running" ? "rgba(16, 185, 129, 0.15)" :
+          bb.campaign.status === "Upcoming" ? "rgba(245, 158, 11, 0.15)" :
+            "rgba(148, 163, 184, 0.15)"
+        };
+                color: ${bb.campaign.status === "Running" ? "#34d399" :
+          bb.campaign.status === "Upcoming" ? "#fbbf24" :
+            "#94a3b8"
+        };
                 font-size: 8px;
                 font-weight: 800;
                 text-transform: uppercase;
@@ -337,7 +378,7 @@ export default function LocationMap({
     (poiLocations || []).forEach((poi) => {
       const c = typeColors[poi.type] || "#94a3b8";
       const poiIcon = L.divIcon({
-        className: "",
+        className: "bg-transparent border-0",
         html: `<div style="width:10px;height:10px;background:${c};border:1.5px solid rgba(255,255,255,0.8);border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></div>`,
         iconSize: [10, 10], iconAnchor: [5, 5],
       });
@@ -352,8 +393,8 @@ export default function LocationMap({
       const intensity = pt.intensity ?? 0.5;
       const color = intensity > 0.8 ? "#ef4444"
         : intensity > 0.6 ? "#f97316"
-        : intensity > 0.4 ? "#fbbf24"
-        : "#4ade80";
+          : intensity > 0.4 ? "#fbbf24"
+            : "#4ade80";
       L.circle([pt.lat, pt.lng], {
         radius: Math.max(80, radius * 0.12),
         fillColor: color,
@@ -363,9 +404,9 @@ export default function LocationMap({
       }).addTo(layersRef.current.heatGroup);
     });
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latitude, longitude, radius, poiLocations, heatmapPoints, selectedLat, selectedLng,
-      leafletReady, billboards]);
+    leafletReady, billboards]);
 
   // ── Helpers ──
   const zoom = (dir: "in" | "out") => {
@@ -384,15 +425,22 @@ export default function LocationMap({
   const LAYER_LABELS: { key: keyof typeof layerViz; label: string }[] = [
     { key: "markers", label: "Candidate Marker" },
     { key: "billboards", label: "Static Billboards" },
-    { key: "radius",  label: "Radius Circle" },
-    { key: "pois",    label: "POI Points" },
+    { key: "radius", label: "Radius Circle" },
     { key: "heatmap", label: "Density Heatmap" },
-    { key: "transit", label: "Transit Layer" },
   ];
 
   return (
     <div className="relative w-full h-[520px] rounded-2xl overflow-hidden border border-border shadow-xl group">
-      <div ref={mapContainerRef} className="w-full h-full z-10" />
+      <div
+        ref={mapContainerRef}
+        className={`w-full h-full z-10 ${isMapPickingActive ? "map-pick-mode" : ""}`}
+      />
+      <style>{`
+        .leaflet-container.map-pick-mode,
+        .leaflet-container.map-pick-mode * {
+          cursor: crosshair !important;
+        }
+      `}</style>
 
       {/* Base layer switcher (top right) */}
       <div className="absolute top-3 right-3 z-20 flex flex-col gap-2">
@@ -401,11 +449,10 @@ export default function LocationMap({
             <button
               key={t}
               onClick={() => setMapType(t)}
-              className={`px-2 py-1 rounded capitalize transition-all ${
-                mapType === t
+              className={`px-2 py-1 rounded capitalize transition-all ${mapType === t
                   ? "bg-primary text-primary-foreground font-black"
                   : "text-muted-foreground hover:text-foreground"
-              }`}
+                }`}
             >
               {t}
             </button>

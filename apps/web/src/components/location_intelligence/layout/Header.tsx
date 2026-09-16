@@ -2,12 +2,15 @@
 
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+
 import {
   Bell,
   MapPin,
   Play,
   ChevronDown,
 } from "lucide-react";
+
+const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || "http://localhost:8080";
 
 interface HeaderProps {
   latitude: number;
@@ -52,7 +55,7 @@ export default function Header({
     const lng = parseFloat(lngVal);
     if (!isNaN(lat) && !isNaN(lng)) {
       const delayDebounce = setTimeout(() => {
-        axios.get("http://127.0.0.1:8000/api/v1/area/detect", {
+        axios.get(`${API_BASE}/api/location/v1/area/detect`, {
           params: { latitude: lat, longitude: lng }
         }).then(res => {
           setDetectedArea(res.data.area);
@@ -81,7 +84,7 @@ export default function Header({
     // If a different area search name was typed by the user, geocode it first!
     if (areaSearch && areaSearch !== detectedArea && areaSearch !== area) {
       try {
-        const res = await axios.get("http://127.0.0.1:8000/api/v1/geocode", {
+        const res = await axios.get(`${API_BASE}/api/location/v1/geocode`, {
           params: { q: areaSearch }
         });
         const { latitude: newLat, longitude: newLng } = res.data;
@@ -187,13 +190,16 @@ export default function Header({
             <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           </div>
 
+
+
           {/* Map Pin Picker Trigger */}
           <button
             onClick={() => setIsMapPickingActive(!isMapPickingActive)}
-            className={`flex items-center justify-center gap-1.5 px-4 py-1.5 border rounded-lg text-xs font-extrabold transition-all duration-200 shrink-0 ${isMapPickingActive
+            className={`flex items-center justify-center gap-1.5 px-4 py-1.5 border rounded-lg text-xs font-extrabold transition-all duration-200 shrink-0 ${
+              isMapPickingActive
                 ? "bg-primary border-primary text-primary-foreground animate-pulse shadow-md"
-                : "border-border bg-background hover:bg-secondary text-muted-foreground hover:text-white"
-              }`}
+                : "border-border bg-background/90 hover:bg-secondary text-muted-foreground hover:text-white"
+            }`}
             title="Click and select a point directly on the interactive map"
           >
             <MapPin size={14} className={isMapPickingActive ? "animate-bounce" : ""} />

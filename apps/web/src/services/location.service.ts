@@ -1,7 +1,7 @@
 import axios from "axios";
 import { LocationAnalytics, POILocation, HeatmapPoint, AdRecommendation } from "../types/location";
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 const TIMEOUT_MS = 30000;
 
 /**
@@ -160,8 +160,8 @@ export function generateMockAnalytics(
 
   // Dynamic AI Recommendations per location
   const allCategories = [
-    { cat: "Automotive & Electric Vehicles", score: Math.round(82 + h1 * 14), conf: Math.round(88 + h2 * 8), reason: `High vehicular throughput along ${areaName} commercial artery.` },
-    { cat: "E-Commerce & Quick Commerce", score: Math.round(78 + h2 * 16), conf: Math.round(85 + h3 * 10), reason: `Dense residential footprint within ${radius}m viewing cone.` },
+    { cat: "Automotive & Electric Vehicles", score: Math.round(82 + h1 * 14), conf: Math.round(88 + h2 * 8), reason: `High vehicular throughput along the ${areaName} commercial artery.` },
+    { cat: "E-Commerce & Quick Commerce", score: Math.round(78 + h2 * 16), conf: Math.round(85 + h3 * 10), reason: `Dense residential footprint within the immediate viewing cone.` },
     { cat: "Banking, Insurance & FinTech", score: Math.round(74 + h3 * 18), conf: Math.round(82 + h4 * 12), reason: `High financial institution concentration in immediate vicinity.` },
     { cat: "Apparel & Lifestyle Retail", score: Math.round(70 + h4 * 20), conf: Math.round(80 + h5 * 14), reason: `Strong footfall potential and retail establishment density.` },
   ];
@@ -238,14 +238,14 @@ export function generateMockAnalytics(
     explanation: {
       positive: [
         `High commercial activity detected around ${areaName}`,
-        `Strong transit connectivity score of ${transitConnectivity}% within ${radius}m`,
-        `Walkability index of ${walkability}% supporting sustained footfall`,
+        `Strong transit connectivity score and accessibility in this zone`,
+        `Excellent walkability index supporting sustained footfall`,
       ],
       negative: [
-        `Competition density index at ${competitionLevel}% requiring strategic messaging`,
-        `Monsoon weather exposure potential requiring IP67 screen casing`,
+        `Competition density requiring strategic messaging and placement`,
+        `Monsoon weather exposure potential requiring specialized weatherproofing`,
       ],
-      summary: `Site at ${areaName} scores ${overallScore}% overall with high suitability for targeted campaign execution.`,
+      summary: `Site at ${areaName} shows high suitability for targeted campaign execution.`,
     },
     poi_distribution: poiDistribution,
     land_use_distribution: landUseDistribution,
@@ -273,7 +273,7 @@ export const locationService = {
     });
 
     try {
-      const response = await axios.get(`${API_BASE}/api/v1/analyze`, {
+      const response = await axios.get(`${API_BASE}/api/location/v1/analyze`, {
         params: { latitude, longitude, radius },
         timeout: TIMEOUT_MS,
       });
@@ -288,7 +288,7 @@ export const locationService = {
       return data as LocationAnalytics;
     } catch (err: any) {
       console.error(
-        `[locationService] API request failed (${err.code || err.name}: ${err.message}). Endpoint: ${API_BASE}/api/v1/analyze. Generating dynamic coordinate-based spatial analytics.`,
+        `[locationService] API request failed (${err.code || err.name}: ${err.message}). Endpoint: ${API_BASE}/api/location/v1/analyze. Generating dynamic coordinate-based spatial analytics.`,
         err
       );
       return generateMockAnalytics(latitude, longitude, radius);
@@ -307,9 +307,9 @@ export const locationService = {
     latitude?: number | null;
     longitude?: number | null;
   }) => {
-    console.info(`[locationService] Dispatching recommendation API request: POST ${API_BASE}/api/v1/recommend`, params);
+    console.info(`[locationService] Dispatching recommendation API request: POST ${API_BASE}/api/location/v1/recommend`, params);
     try {
-      const response = await axios.post(`${API_BASE}/api/v1/recommend`, params, {
+      const response = await axios.post(`${API_BASE}/api/location/v1/recommend`, params, {
         timeout: TIMEOUT_MS,
       });
       return response.data;

@@ -24,7 +24,7 @@ export default function Dashboard() {
   const isCustomId = true;
 
   // ── UI State ──
-  const [isMapPickingActive, setIsMapPickingActive] = useState(false);
+  const [isMapPickingActive, setIsMapPickingActive] = useState(true);
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [aiReportGenerating, setAiReportGenerating] = useState(false);
   const [aiReportContent, setAiReportContent] = useState("");
@@ -88,7 +88,6 @@ export default function Dashboard() {
   const handleLocationPicked = (lat: number, lng: number) => {
     setCandidateLat(lat);
     setCandidateLng(lng);
-    setIsMapPickingActive(false);
   };
 
   const handleRefresh = () => refetchAnalytics();

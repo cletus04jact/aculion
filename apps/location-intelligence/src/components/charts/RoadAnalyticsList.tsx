@@ -27,8 +27,8 @@ export default function RoadAnalyticsList({ data }: RoadAnalyticsListProps) {
   ];
 
   return (
-    <div className="w-full h-[300px] flex items-center justify-center">
-      <ResponsiveContainer width="100%" height={300}>
+    <div className="w-full h-[280px] min-h-[280px] min-w-0 relative flex items-center justify-center overflow-hidden">
+      <ResponsiveContainer width="100%" height={260} debounce={100}>
         <RadarChart cx="50%" cy="50%" outerRadius="70%" data={chartData}>
           <PolarGrid stroke="rgba(255, 255, 255, 0.08)" />
           <PolarAngleAxis 
@@ -49,10 +49,11 @@ export default function RoadAnalyticsList({ data }: RoadAnalyticsListProps) {
             stroke="#0055ff"
             fill="#0055ff"
             fillOpacity={0.25}
+            isAnimationActive={false}
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: "#0e0f12",
+              backgroundColor: "#0f172a",
               borderColor: "rgba(255,255,255,0.08)",
               borderRadius: "12px",
               fontSize: "11px",

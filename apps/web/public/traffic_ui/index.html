@@ -515,68 +515,6 @@
                             </div>
                         </div>
                     </div>
-
-                    <!-- AI Camera Feed – LIVE -->
-                    <div class="glass-panel analytics-card" id="classif-camera-card">
-                        <div class="card-header">
-                            <div class="header-info">
-                                <div style="display:flex;align-items:center;gap:10px;">
-                                    <h2 style="margin:0;">AI Camera Feed</h2>
-                                    <span class="badge-live-green">● LIVE</span>
-                                </div>
-                                <p class="card-subtitle" id="classifCamLabel">Camera ID: Loading...</p>
-                            </div>
-                            <div style="display:flex;align-items:center;gap:8px;">
-                                <select id="classifCamSelect" class="cam-select-mini">
-                                    <option value="cam-1">Active Camera Feed</option>
-                                </select>
-                                <button class="btn-icon-ghost" id="classifFullscreenBtn" title="Full Screen">
-                                    <i data-lucide="maximize-2"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Canvas feed -->
-                        <div class="classif-cam-wrapper" id="classifCamWrapper">
-                            <div class="cam2-hud">
-                                <div class="hud2-tl"><span class="rec-dot">●</span> REC</div>
-                                <div class="hud2-tr" id="classifHudTime">2026-07-28 12:24:51</div>
-                                <div class="hud2-bl">
-                                    <span id="classifHudVehicles">ACTIVE: 0</span>
-                                    &nbsp;|&nbsp;
-                                    <span id="classifHudFps">FPS: --</span>
-                                </div>
-                                <div class="hud2-br">
-                                    <span class="ai-proc-dot"></span> AI PROCESSING
-                                </div>
-                            </div>
-                            <canvas id="classifyCctvCanvas" width="960" height="420"></canvas>
-                        </div>
-
-                        <!-- Bottom info bar -->
-                        <div class="cam2-info-bar">
-                            <div class="cam2-info-item">
-                                <span class="cam2-info-label">Vehicles Detected</span>
-                                <span class="cam2-info-val" id="classifTotalVeh">17,820</span>
-                            </div>
-                            <div class="cam2-info-item">
-                                <span class="cam2-info-label">Dwell Time</span>
-                                <span class="cam2-info-val" id="classifDwell">14.8s</span>
-                            </div>
-                            <div class="cam2-info-item">
-                                <span class="cam2-info-label">Confidence</span>
-                                <span class="cam2-info-val text-cyan" id="classifConf">98.7%</span>
-                            </div>
-                            <div class="cam2-info-item">
-                                <span class="cam2-info-label">Avg Speed</span>
-                                <span class="cam2-info-val" id="classifSpeed">42 km/h</span>
-                            </div>
-                            <div class="cam2-info-item">
-                                <span class="cam2-info-label">Direction</span>
-                                <span class="cam2-info-val">North ↑</span>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </section>
         </main>
