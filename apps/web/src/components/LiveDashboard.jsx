@@ -1848,7 +1848,7 @@ export default function LiveDashboard({
             {activeNav === 'traffic' && (
               <iframe
                 key={`${selectedBillboard?.billboard_code || selectedBillboard?.id || 'traffic-frame'}-${dbTrafficData ? 'data' : 'nodata'}`}
-                src="/traffic_ui/index.html"
+                src={`/traffic_ui/index.html?api=${encodeURIComponent(import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080')}`}
                 title="Audience Intelligence"
                 className="w-full h-full border-none"
               />

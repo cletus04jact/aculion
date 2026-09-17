@@ -61,10 +61,10 @@ class AdIntelligenceConfig(BaseModel):
         default_factory=lambda: os.getenv("SUPABASE_URL", "https://buqtshfptmqieaqcghfx.supabase.co")
     )
     SUPABASE_KEY: str = Field(
-        default_factory=lambda: os.getenv("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ1cXRzaGZwdG1xaWVhcWNnaGZ4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MzkwOTYyMiwiZXhwIjoyMDk5NDg1NjIyfQ.f12uC9oK_BzLzlXgy_5ybUAgdHJTY6N7E5VWXXmgr5Q")
+        default_factory=lambda: os.getenv("SUPABASE_KEY", "")
     )
     DATABASE_URL: str = Field(
-        default_factory=lambda: os.getenv("DATABASE_URL", "postgresql://postgres.buqtshfptmqieaqcghfx:Aculion%402025@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres?sslmode=require")
+        default_factory=lambda: os.getenv("DATABASE_URL", "")
     )
     STORAGE_BUCKET: str = Field(default="ad-evidence", description="Supabase Storage bucket for ad snapshots")
     

@@ -10,7 +10,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 
-const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || "http://localhost:8080";
+const API_BASE = (import.meta as any).env?.VITE_API_URL || (import.meta as any).env?.VITE_API_BASE_URL || "http://localhost:8080";
 
 interface HeaderProps {
   latitude: number;

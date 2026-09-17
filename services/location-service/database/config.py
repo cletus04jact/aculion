@@ -1,14 +1,19 @@
 """
 Database credentials configuration.
-Values are read from the .env file at project root.
+Values are read from environment variables or .env file.
 """
 import os
-from dotenv import load_dotenv
 from pathlib import Path
+from dotenv import load_dotenv
 
-# Resolve .env from project root (two levels up from backend/database/)
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-load_dotenv(dotenv_path=_PROJECT_ROOT / ".env")
+# Try loading from current directory, service root, or monorepo root
+load_dotenv()
+_SERVICE_DIR = Path(__file__).resolve().parent.parent
+if (_SERVICE_DIR / ".env").exists():
+    load_dotenv(dotenv_path=_SERVICE_DIR / ".env")
+_PROJECT_ROOT = _SERVICE_DIR.parent.parent
+if (_PROJECT_ROOT / ".env").exists():
+    load_dotenv(dotenv_path=_PROJECT_ROOT / ".env")
 
 DB_HOST     = os.getenv("DB_HOST",     "localhost")
 DB_PORT     = int(os.getenv("DB_PORT", "5432"))
@@ -21,6 +26,10 @@ if not DATABASE_URL:
     from urllib.parse import quote_plus
     DATABASE_URL = f"postgresql://{DB_USER}:{quote_plus(DB_PASSWORD)}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 else:
+    # Normalize postgres:// to postgresql:// for SQLAlchemy 2.0 compatibility
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = "postgresql://" + DATABASE_URL[len("postgres://"):]
+
     # Defensive parsing for passwords containing special characters (like '@')
     if DATABASE_URL.startswith("postgresql://"):
         try:
