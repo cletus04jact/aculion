@@ -1603,3 +1603,210 @@ h1, h2, h3, h4, .kpi-value, .brand-name {
     width: 100%;
 }
 
+/* ===================================================
+   RESPONSIVE DESIGN BREAKPOINTS
+   - Large Desktop: >= 1440px
+   - Desktop: 1024px – 1439px
+   - Tablet: 768px – 1023px
+   - Mobile: <= 767px
+   - Small Mobile: <= 480px
+=================================================== */
+
+@media (max-width: 1023px) {
+    .main-layout {
+        padding: 16px;
+    }
+
+    .dashboard-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .header-selectors {
+        flex-wrap: wrap;
+        width: 100%;
+    }
+
+    .header-actions {
+        flex-wrap: wrap;
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .analytics-row-main {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .kpi-grid {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+}
+
+@media (max-width: 767px) {
+    .main-layout {
+        padding: 12px;
+    }
+
+    .dashboard-header {
+        margin-bottom: 16px;
+        gap: 12px;
+    }
+
+    .header-titles h1 {
+        font-size: clamp(20px, 5vw, 24px);
+    }
+
+    .subtitle {
+        font-size: 11px;
+    }
+
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+
+    .kpi-card {
+        padding: 14px;
+        min-height: 110px;
+    }
+
+    .kpi-value {
+        font-size: 20px;
+    }
+
+    .kpi-value.time-value {
+        font-size: 13px;
+    }
+
+    .analytics-card {
+        padding: 16px;
+        border-radius: 14px;
+    }
+
+    .card-header {
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .classification-list {
+        gap: 12px;
+    }
+
+    .class-item {
+        gap: 6px;
+    }
+
+    .class-label, .class-count {
+        font-size: 12px;
+    }
+
+    .class-pct {
+        font-size: 11px;
+    }
+
+    .dwell-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+
+    .day-periods-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+
+    /* Traffic Density Heat Timeline Mobile Horizontal Scroll */
+    .heatmap-outer-wrapper {
+        width: 100%;
+        overflow: hidden;
+    }
+
+    .heatmap-timeline {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 8px;
+        gap: 3px;
+        width: 100%;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(30, 136, 255, 0.4) transparent;
+    }
+
+    .heatmap-block {
+        min-width: 32px;
+        height: 32px;
+        flex-shrink: 0;
+    }
+
+    .heatmap-legend {
+        font-size: 9.5px;
+    }
+
+    .trend-chart-panel {
+        min-height: 300px;
+    }
+
+    .trend-chart-container, #trafficTrendLineChart {
+        min-height: 240px;
+        height: 240px;
+    }
+
+    .donut-chart-container, #vehicleDonutChart {
+        min-height: 240px;
+        height: 240px;
+    }
+}
+
+@media (max-width: 480px) {
+    .main-layout {
+        padding: 10px;
+    }
+
+    .kpi-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .header-left {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .header-right {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .selector-box {
+        width: 100%;
+    }
+
+    .header-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+    .update-timestamp {
+        grid-column: span 2;
+        text-align: center;
+    }
+
+    .dwell-stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .day-periods-grid {
+        grid-template-columns: 1fr;
+    }
+}
+

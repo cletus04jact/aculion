@@ -155,9 +155,22 @@ export default function LiveDashboard({
     return map[seg] || 'traffic';
   };
   const [activeNav, setActiveNav] = useState(getNavFromPath);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [mainMediaView, setMainMediaView] = useState('map');
   const [timeFilter, setTimeFilter] = useState('24H');
+  
+  // Prevent background scrolling on mobile when sidebar drawer is open
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [sidebarOpen]);
   
   const getSeed = () => {
     const str = selectedBillboard?.billboard_code || selectedBillboard?.id || 'default';
@@ -277,29 +290,29 @@ export default function LiveDashboard({
 
     async function fetchDbTrafficOverview(isSilent = false) {
       if (!isSilent) setIsTrafficLoading(true);
-      if (!selectedBillboard?.billboard_code) {
-        setDbTrafficData(null);
-        localStorage.removeItem('aculion_traffic_overview');
-        if (!isSilent) setIsTrafficLoading(false);
-        return;
-      }
+      const bbCode = selectedBillboard?.billboard_code || selectedBillboard?.id;
       try {
+        let data = null;
+
         // 1. First attempt: match by billboard_code
-        let { data, error } = await supabase
-          .from("traffic_overview")
-          .select("*")
-          .eq("billboard_code", selectedBillboard.billboard_code)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        if (bbCode) {
+          const res = await supabase
+            .from("traffic_overview")
+            .select("*")
+            .eq("billboard_code", bbCode)
+            .order("last_updated", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (res.data) data = res.data;
+        }
 
         // 2. Second attempt: match by camera_ff_code if not found
-        if (!data && selectedBillboard.camera_ff_code) {
+        if (!data && selectedBillboard?.camera_ff_code) {
           const res = await supabase
             .from("traffic_overview")
             .select("*")
             .eq("camera_ff_code", selectedBillboard.camera_ff_code)
-            .order("created_at", { ascending: false })
+            .order("last_updated", { ascending: false })
             .limit(1)
             .maybeSingle();
           if (res.data) data = res.data;
@@ -317,6 +330,17 @@ export default function LiveDashboard({
           if (res.data) data = res.data;
         }
 
+        // 4. Fourth fallback: query absolute latest record
+        if (!data) {
+          const res = await supabase
+            .from("traffic_overview")
+            .select("*")
+            .order("last_updated", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (res.data) data = res.data;
+        }
+
         if (data) {
           setDbTrafficData(data);
           localStorage.setItem('aculion_traffic_overview', JSON.stringify(data));
@@ -328,9 +352,14 @@ export default function LiveDashboard({
           if (data.avg_exposure_time !== undefined && data.avg_exposure_time !== null) {
             setLiveDwell(Number(data.avg_exposure_time));
           }
-        } else {
-          setDbTrafficData(null);
-          localStorage.removeItem('aculion_traffic_overview');
+
+          // Broadcast to any embedded iframes (e.g. traffic_ui Audience Intelligence)
+          document.querySelectorAll('iframe').forEach(frame => {
+            frame.contentWindow?.postMessage({
+              type: 'ACULION_TRAFFIC_DATA_UPDATE',
+              data: data
+            }, '*');
+          });
         }
       } catch (err) {
         console.error("[LiveDashboard] fetchDbTrafficOverview exception:", err);
@@ -343,7 +372,7 @@ export default function LiveDashboard({
 
     const intervalId = setInterval(() => {
       fetchDbTrafficOverview(true);
-    }, 10000);
+    }, 7500);
 
     return () => {
       clearInterval(intervalId);
@@ -1201,35 +1230,62 @@ export default function LiveDashboard({
   const userName = user?.name || user?.fullName || 'Media Owner';
 
   return (
-    <div className="w-screen h-screen bg-[#0a0e1a] text-white flex flex-col font-sans select-none overflow-hidden relative">
+    <div className="w-full h-screen bg-[#0a0e1a] text-white flex flex-col font-sans select-none overflow-hidden relative">
       
       {/* ═══════════════════════════════════════════════════
          MAIN BODY DECOUPLED COLUMNS
       ═══════════════════════════════════════════════════ */}
       <div className="flex flex-1 overflow-hidden min-h-0 w-full relative">
 
+        {/* Backdrop for Mobile/Tablet Sidebar Drawer */}
+        {sidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300"
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
         {/* ── SIDEBAR (Left Column - 280px width) ── */}
-        <aside className="w-[280px] border-r border-white/10 bg-[#080b15] flex flex-col justify-between overflow-hidden h-full flex-shrink-0">
+        <aside className={`fixed lg:static top-0 bottom-0 left-0 z-50 w-[280px] max-w-[85vw] border-r border-white/10 bg-[#080b15] flex flex-col justify-between overflow-hidden h-full flex-shrink-0 transform transition-transform duration-300 ease-in-out shadow-2xl lg:shadow-none ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}>
           
           {/* Logo brand section */}
-          <div className="p-6 border-b border-white/10 flex flex-col gap-1.5 flex-shrink-0 cursor-pointer" onClick={(e) => navigateTo && navigateTo(e, '/')}>
-            <div className="flex items-center gap-[12px]">
-              <div style={{ width: '50px', height: '56px', overflow: 'hidden', flexShrink: 0 }}>
+          <div className="p-4 sm:p-6 border-b border-white/10 flex items-center justify-between flex-shrink-0">
+            <div 
+              className="flex items-center gap-[12px] cursor-pointer" 
+              onClick={(e) => {
+                setSidebarOpen(false);
+                if (navigateTo) navigateTo(e, '/');
+              }}
+            >
+              <div style={{ width: '44px', height: '50px', overflow: 'hidden', flexShrink: 0 }}>
                 <img 
                   src={transparentLogo} 
                   alt="Aculion Symbol" 
-                  style={{ height: '56px', width: 'auto', maxWidth: 'none', display: 'block' }}
+                  style={{ height: '50px', width: 'auto', maxWidth: 'none', display: 'block' }}
                 />
               </div>
               <div className="flex flex-col">
-                <span className="text-[20px] font-black tracking-[0.05em] text-white uppercase leading-none font-heading">
+                <span className="text-[18px] sm:text-[20px] font-black tracking-[0.05em] text-white uppercase leading-none font-heading">
                   ACULION
                 </span>
-                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.3em] mt-[4px] leading-none">
+                <span className="text-[8.5px] sm:text-[9px] text-slate-400 font-bold uppercase tracking-[0.3em] mt-[4px] leading-none">
                   SEE BEYOND
                 </span>
               </div>
             </div>
+
+            {/* Mobile / Tablet Close Button */}
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden p-2 text-white/50 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] rounded-lg border border-white/10 w-8 h-8 flex items-center justify-center transition-colors cursor-pointer"
+              aria-label="Close navigation"
+            >
+              <i className="fa-solid fa-xmark text-sm" />
+            </button>
           </div>
 
           <div className="flex-1 flex flex-col p-3 gap-1 overflow-y-auto min-h-0">
@@ -1249,6 +1305,7 @@ export default function LiveDashboard({
               <button
                 key={item.id}
                 onClick={() => {
+                  setSidebarOpen(false);
                   if (item.id === 'my_medias') {
                     if (onBackToProfile) onBackToProfile();
                   } else {
@@ -1270,7 +1327,7 @@ export default function LiveDashboard({
                     setActiveNav(item.id);
                   }
                 }}
-                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left text-[12px] font-semibold transition-all !w-full !border-none !shadow-none cursor-pointer ${
+                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left text-[12px] font-semibold transition-all !w-full !border-none !shadow-none cursor-pointer min-h-[40px] ${
                   activeNav === item.id 
                     ? '!bg-blue-600 !text-white shadow-lg shadow-blue-500/20' 
                     : '!bg-transparent hover:!bg-white/[0.04] !text-white/60 hover:!text-white'
@@ -1312,41 +1369,53 @@ export default function LiveDashboard({
           {/* ═══════════════════════════════════════════════════
              TOP BAR (TARGET REFERENCE DESIGN 1)
           ═══════════════════════════════════════════════════ */}
-          <header className="h-[76px] border-b border-white/10 px-8 flex items-center justify-between bg-[#080c16] flex-shrink-0 w-full">
-            {/* Greeting */}
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-white/60">Welcome back,</span>
+          <header className="min-h-[64px] sm:h-[76px] border-b border-white/10 px-4 sm:px-6 lg:px-8 py-3 sm:py-0 flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 bg-[#080c16] flex-shrink-0 w-full">
+            {/* Left: Hamburger Button & Greeting */}
+            <div className="flex items-center gap-3">
+              {/* Hamburger Button (Visible on Tablet & Mobile) */}
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden p-2 text-white/80 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 rounded-xl flex items-center justify-center w-10 h-10 transition-all cursor-pointer flex-shrink-0"
+                aria-label="Open navigation"
+              >
+                <i className="fa-solid fa-bars text-base" />
+              </button>
+
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs sm:text-sm font-medium text-white/60">Welcome back,</span>
+                </div>
+                <h1 className="text-base sm:text-xl font-bold font-heading text-white tracking-wide leading-tight">
+                  {userName} 👋
+                </h1>
+                <p className="text-[11px] sm:text-xs text-white/40 font-medium leading-none mt-0.5 sm:mt-1 hidden sm:block">
+                  Here's what's happening across your media today.
+                </p>
               </div>
-              <h1 className="text-xl font-bold font-heading text-white tracking-wide leading-tight">
-                {userName} 👋
-              </h1>
-              <p className="text-xs text-white/40 font-medium leading-none mt-1">
-                Here's what's happening across your media today.
-              </p>
             </div>
 
             {/* Header Actions */}
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 bg-[#121829] border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white/80 font-medium">
-                <i className="fa-regular fa-calendar text-blue-400 text-xs" />
-                <span className="font-mono">Today, {formattedDate}</span>
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              <div className="flex items-center gap-1.5 sm:gap-2 bg-[#121829] border border-white/10 rounded-xl px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs text-white/80 font-medium">
+                <i className="fa-regular fa-calendar text-blue-400 text-[11px] sm:text-xs" />
+                <span className="font-mono whitespace-nowrap">Today, {formattedDate}</span>
               </div>
 
               {user?.role === 'Administrator' ? (
                 <button
                   onClick={onAddNewMedia || onBackToProfile}
-                  className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-500/20 border border-blue-400/30 transition-all flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 sm:px-4 py-1.5 sm:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-[11px] sm:text-xs font-semibold shadow-lg shadow-blue-500/20 border border-blue-400/30 transition-all flex items-center gap-1.5 cursor-pointer min-h-[36px] sm:min-h-[40px]"
                 >
-                  <i className="fa-solid fa-plus text-xs" />
+                  <i className="fa-solid fa-plus text-[10px] sm:text-xs" />
                   <span>Add Media</span>
                 </button>
               ) : (
                 <button
                   onClick={onBackToProfile}
-                  className="px-4 py-2.5 rounded-xl bg-[#121829] hover:bg-[#1a223a] text-cyan-400 text-xs font-semibold shadow-lg border border-cyan-500/30 transition-all flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 sm:px-4 py-1.5 sm:py-2.5 rounded-xl bg-[#121829] hover:bg-[#1a223a] text-cyan-400 text-[11px] sm:text-xs font-semibold shadow-lg border border-cyan-500/30 transition-all flex items-center gap-1.5 cursor-pointer min-h-[36px] sm:min-h-[40px]"
                 >
-                  <i className="fa-solid fa-headset text-xs text-cyan-400" />
+                  <i className="fa-solid fa-headset text-[10px] sm:text-xs text-cyan-400" />
                   <span>Contact Aculion to Add Media</span>
                 </button>
               )}
@@ -1374,10 +1443,10 @@ export default function LiveDashboard({
                1. LIVE VIEW (EXACT TARGET REFERENCE DESIGN 1)
             ═══════════════════════════════════════════════════ */}
             {activeNav === 'live' && (
-              <div className="flex-1 flex flex-col p-6 gap-6 min-w-0">
+              <div className="flex-1 flex flex-col p-4 sm:p-5 lg:p-6 gap-4 sm:gap-6 min-w-0">
 
                 {/* ── 1. TOP KPI CARDS ROW (5 CARDS) ── */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
                   {/* Card 1: Total Medias */}
                   <div className="bg-[#0f1424]/90 border border-white/10 rounded-2xl p-4 flex flex-col justify-between shadow-xl relative overflow-hidden">
                     <div className="flex items-center justify-between">
@@ -1865,7 +1934,7 @@ export default function LiveDashboard({
                3. CORRIDOR INTELLIGENCE
             ═══════════════════════════════════════════════════ */}
             {activeNav === 'corridor' && (
-              <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+              <div className="flex-1 flex flex-col p-4 sm:p-5 lg:p-6 gap-4 min-w-0 overflow-y-auto">
                 <div className="flex items-center justify-between flex-shrink-0">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400">Junction Corridor Flow Matrix</h3>
                 </div>
@@ -1905,7 +1974,7 @@ export default function LiveDashboard({
                 </div>
 
                 {/* Speed vs Congestion metrics */}
-                <div className="grid grid-cols-2 gap-4 h-[120px] flex-shrink-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-h-[120px] flex-shrink-0">
                   <div className="bg-[#0f172a]/60 border border-white/10 rounded-xl p-3 flex flex-col justify-around shadow-lg">
                     <span className="text-[9.5px] text-cyan-400 font-bold uppercase tracking-wider">Corridor Congestion Average</span>
                     <div className="flex items-center justify-between text-[11px]">
@@ -1929,12 +1998,12 @@ export default function LiveDashboard({
                4. ZONE COMPARISON
             ═══════════════════════════════════════════════════ */}
             {activeNav === 'zone' && (
-              <div className="flex-grow flex flex-col gap-4 overflow-y-auto pr-1">
-                <div className="flex items-center justify-between flex-shrink-0">
+              <div className="flex-1 flex flex-col p-4 sm:p-5 lg:p-6 gap-4 min-w-0 overflow-y-auto">
+                <div className="flex flex-wrap items-center justify-between gap-2 flex-shrink-0">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400">Multi-Zone Dashboard Comparison</h3>
                   
                   {/* Select zone toggles */}
-                  <div className="flex bg-[#121829] border border-white/10 rounded p-0.5 text-[9.5px]">
+                  <div className="flex flex-wrap bg-[#121829] border border-white/10 rounded p-0.5 text-[9.5px]">
                     {[
                       { key: 'zoneA', label: 'Commercial Zone A' },
                       { key: 'zoneB', label: 'Retail Zone B' },
@@ -1943,7 +2012,7 @@ export default function LiveDashboard({
                       <button
                         key={opt.key}
                         onClick={() => setActiveZoneCompare(prev => ({ ...prev, [opt.key]: !prev[opt.key] }))}
-                        className={`px-3 py-1 rounded font-semibold transition-all !border-none !shadow-none ${
+                        className={`px-3 py-1 rounded font-semibold transition-all !border-none !shadow-none cursor-pointer ${
                           activeZoneCompare[opt.key] ? 'bg-blue-600 text-white' : 'text-white/40 hover:text-white'
                         }`}
                       >
@@ -1953,7 +2022,7 @@ export default function LiveDashboard({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {/* Commercial Zone */}
                   {activeZoneCompare.zoneA && (
                     <div className="bg-[#0f172a]/60 border border-blue-500/30 rounded-xl p-4 flex flex-col justify-between shadow-lg h-[260px]">
@@ -2027,17 +2096,17 @@ export default function LiveDashboard({
                5. HISTORICAL TRENDS
             ═══════════════════════════════════════════════════ */}
             {activeNav === 'historical' && (
-              <div className="flex-1 flex flex-col gap-4 overflow-hidden">
-                <div className="flex items-center justify-between flex-shrink-0 font-sans">
+              <div className="flex-1 flex flex-col p-4 sm:p-5 lg:p-6 gap-4 min-w-0 overflow-y-auto">
+                <div className="flex flex-wrap items-center justify-between gap-2 flex-shrink-0 font-sans">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400">Historical Trend Analytics</h3>
                   
                   {/* Select Trend Toggles */}
-                  <div className="flex bg-[#121829] border border-white/10 rounded p-0.5 text-[9.5px]">
+                  <div className="flex flex-wrap bg-[#121829] border border-white/10 rounded p-0.5 text-[9.5px]">
                     {['day', 'week', 'month', 'year'].map(opt => (
                       <button
                         key={opt}
                         onClick={() => setHistoricalFilter(opt)}
-                        className={`px-3 py-1 rounded font-semibold transition-all uppercase !border-none !shadow-none ${
+                        className={`px-3 py-1 rounded font-semibold transition-all uppercase !border-none !shadow-none cursor-pointer ${
                           historicalFilter === opt ? 'bg-blue-600 text-white' : 'text-white/40 hover:text-white'
                         }`}
                       >
@@ -2047,7 +2116,7 @@ export default function LiveDashboard({
                   </div>
                 </div>
 
-                <div className="flex-1 bg-slate-900/60 border border-white/10 rounded-xl p-4 flex flex-col shadow-lg min-h-0">
+                <div className="flex-1 bg-slate-900/60 border border-white/10 rounded-xl p-3 sm:p-4 flex flex-col shadow-lg min-h-[300px]">
                   <span className="text-[10px] text-white/45 mb-3 block">Impressions vs Billboard Occupancy Trend Matrix</span>
                   <div className="flex-grow w-full relative min-h-0">
                     <ResponsiveContainer width="100%" height="100%">
@@ -2080,11 +2149,11 @@ export default function LiveDashboard({
                6. ALERTS
             ═══════════════════════════════════════════════════ */}
             {activeNav === 'alerts' && (
-              <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-1">
+              <div className="flex-1 flex flex-col p-4 sm:p-5 lg:p-6 gap-4 min-w-0 overflow-y-auto">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400">Node Status Alerts & Alarms</h3>
 
                 {/* Telemetries */}
-                <div className="grid grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
                   {[
                     { title: 'GPU Core Load', val: '74%', desc: 'AI inference pipeline online', color: 'text-blue-400' },
                     { title: 'Edge Temp', val: '58°C', desc: 'Thermal control normal', color: 'text-emerald-400' },
@@ -2143,10 +2212,10 @@ export default function LiveDashboard({
                7. Reports
             ═══════════════════════════════════════════════════ */}
             {activeNav === 'reports' && (
-              <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-1">
+              <div className="flex-1 flex flex-col p-4 sm:p-5 lg:p-6 gap-4 min-w-0 overflow-y-auto">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400">Campaign Report compiler</h3>
 
-                <div className="grid grid-cols-[1.2fr_1.8fr] gap-4 min-h-[300px]">
+                <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1.8fr] gap-4 min-h-[300px]">
                   {/* Query config panel */}
                   <form onSubmit={handleGenerateReport} className="bg-slate-900/60 border border-white/10 rounded-xl p-4 flex flex-col justify-between shadow-lg h-full">
                     <div className="flex flex-col gap-3">
@@ -2242,13 +2311,13 @@ export default function LiveDashboard({
                SETTINGS
             ═══════════════════════════════════════════════════ */}
             {activeNav === 'settings' && (
-              <form onSubmit={handleSaveSettings} className="flex-1 flex flex-col gap-4 overflow-y-auto pr-1">
+              <form onSubmit={handleSaveSettings} className="flex-1 flex flex-col p-4 sm:p-5 lg:p-6 gap-4 min-w-0 overflow-y-auto">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400 flex-shrink-0">Settings Dashboard</h3>
 
-                <div className="bg-slate-900/60 border border-white/10 rounded-xl p-5 flex flex-col gap-4 shadow-lg">
+                <div className="bg-slate-900/60 border border-white/10 rounded-xl p-4 sm:p-5 flex flex-col gap-4 shadow-lg">
                   <span className="text-[10px] text-white/45 uppercase font-medium">Dashboard Preferences</span>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1">
                       <label className="text-[10px] text-white/50">Telemetry refresh rate</label>
                       <select 
@@ -2319,9 +2388,9 @@ export default function LiveDashboard({
           </main>
 
           {/* ═══════════════════════════════════════════════════
-             FOOTER STATUS BAR (h-[40px])
+             FOOTER STATUS BAR
           ═══════════════════════════════════════════════════ */}
-          <footer className="h-[40px] border-t border-white/10 px-6 flex items-center justify-between bg-[#05070f] text-[10px] text-white/35 flex-shrink-0 w-full">
+          <footer className="min-h-[40px] border-t border-white/10 px-4 sm:px-6 py-2.5 sm:py-0 flex flex-col sm:flex-row items-center justify-between gap-2 bg-[#05070f] text-[10px] text-white/35 flex-shrink-0 w-full text-center sm:text-left">
             <div className="flex items-center gap-1.5 font-semibold text-[#22c55e]">
               <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] shadow-[0_0_5px_rgba(34,197,94,0.6)]"></span>
               All hardware nodes operational

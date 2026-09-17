@@ -19,12 +19,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         flowRate: Number(data.flow_rate) || 84.5,
                         accuracy: 98.7,
                         classes: {
-                            economy: { name: 'Bike', count: data.bikes || 0, pct: Math.round((data.bikes / data.total_vehicles) * 100) || 0, color: '#1E88FF' },
-                            premium: { name: 'Commercial', count: data.commercial || 0, pct: Math.round((data.commercial / data.total_vehicles) * 100) || 0, color: '#00C4FF' },
-                            luxury: { name: 'Economy', count: data.economy || 0, pct: Math.round((data.economy / data.total_vehicles) * 100) || 0, color: '#8B5CF6' },
-                            ultra: { name: 'Premium', count: data.premium || 0, pct: Math.round((data.premium / data.total_vehicles) * 100) || 0, color: '#F59E0B' },
-                            bikes: { name: 'Luxury', count: data.luxury || 0, pct: Math.round((data.luxury / data.total_vehicles) * 100) || 0, color: '#10B981' },
-                            commercial: { name: 'Ultra Luxury', count: data.ultra_luxury || 0, pct: Math.round((data.ultra_luxury / data.total_vehicles) * 100) || 0, color: '#F97316' }
+                            economy: { name: 'Bike', count: data.bikes || 0, pct: Math.round(((data.bikes || 0) / (data.total_vehicles || 1)) * 100) || 0, color: '#1E88FF' },
+                            premium: { name: 'Commercial', count: data.commercial || 0, pct: Math.round(((data.commercial || 0) / (data.total_vehicles || 1)) * 100) || 0, color: '#00C4FF' },
+                            luxury: { name: 'Economy', count: data.economy || 0, pct: Math.round(((data.economy || 0) / (data.total_vehicles || 1)) * 100) || 0, color: '#8B5CF6' },
+                            ultra: { name: 'Premium', count: data.premium || 0, pct: Math.round(((data.premium || 0) / (data.total_vehicles || 1)) * 100) || 0, color: '#F59E0B' },
+                            bikes: { name: 'Luxury', count: data.luxury || 0, pct: Math.round(((data.luxury || 0) / (data.total_vehicles || 1)) * 100) || 0, color: '#10B981' },
+                            commercial: { name: 'Ultra Luxury', count: data.ultra_luxury || 0, pct: Math.round(((data.ultra_luxury || 0) / (data.total_vehicles || 1)) * 100) || 0, color: '#F97316' }
                         },
                         dwellStats: {
                             avg: Number(data.avg_exposure_time) || 14.8,
@@ -1192,10 +1192,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Connect immediately on startup
     connectToSSE(state.filters.location || 'active-cam');
 
-    // Auto-refresh data and update charts/UI every 10 seconds
+    // Auto-refresh data and update charts/UI every 7.5 seconds
     setInterval(() => {
         fetchLatestData(state.filters.location);
-    }, 10000);
+    }, 7500);
 
     // Listen to parent frame updates
     window.addEventListener('storage', (e) => {
@@ -1205,8 +1205,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.addEventListener('message', (e) => {
-        if (e.data && e.data.type === 'ACULION_TRAFFIC_UPDATE') {
-            const payload = e.data.payload;
+        if (e.data && (e.data.type === 'ACULION_TRAFFIC_UPDATE' || e.data.type === 'ACULION_TRAFFIC_DATA_UPDATE')) {
+            const payload = e.data.payload || e.data.data;
             if (payload) {
                 const parsedData = {
                     total_vehicles: payload.total_vehicles,
@@ -1215,12 +1215,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     peak_traffic_hour: payload.peak_traffic_hour || 'N/A',
                     estimated_reach: payload.estimated_reach || 0,
                     flow_rate: Number(payload.flow_rate) || 0.0,
-                    economy: payload.bikes || 0,
-                    premium: payload.commercial || 0,
-                    luxury: payload.economy || 0,
-                    ultra_luxury: payload.premium || 0,
-                    bikes: payload.luxury || 0,
-                    commercial: payload.ultra_luxury || 0
+                    bikes: payload.bikes || 0,
+                    commercial: payload.commercial || 0,
+                    economy: payload.economy || 0,
+                    premium: payload.premium || 0,
+                    luxury: payload.luxury || 0,
+                    ultra_luxury: payload.ultra_luxury || 0,
+                    last_updated: payload.last_updated
                 };
                 updateDashboardWithLiveData(parsedData);
             }
@@ -1268,12 +1269,13 @@ document.addEventListener('DOMContentLoaded', () => {
                             peak_traffic_hour: dbData.peak_traffic_hour || 'N/A',
                             estimated_reach: dbData.estimated_reach || 0,
                             flow_rate: Number(dbData.flow_rate) || 0.0,
-                            economy: dbData.bikes || 0,
-                            premium: dbData.commercial || 0,
-                            luxury: dbData.economy || 0,
-                            ultra_luxury: dbData.premium || 0,
-                            bikes: dbData.luxury || 0,
-                            commercial: dbData.ultra_luxury || 0
+                            bikes: dbData.bikes || 0,
+                            commercial: dbData.commercial || 0,
+                            economy: dbData.economy || 0,
+                            premium: dbData.premium || 0,
+                            luxury: dbData.luxury || 0,
+                            ultra_luxury: dbData.ultra_luxury || 0,
+                            last_updated: dbData.last_updated
                         };
                         updateDashboardWithLiveData(parsedData);
                         return;
@@ -1309,12 +1311,13 @@ document.addEventListener('DOMContentLoaded', () => {
                             peak_traffic_hour: dbData.peak_traffic_hour || 'N/A',
                             estimated_reach: dbData.estimated_reach || 0,
                             flow_rate: Number(dbData.flow_rate) || 0.0,
-                            economy: dbData.bikes || 0,
-                            premium: dbData.commercial || 0,
-                            luxury: dbData.economy || 0,
-                            ultra_luxury: dbData.premium || 0,
-                            bikes: dbData.luxury || 0,
-                            commercial: dbData.ultra_luxury || 0
+                            bikes: dbData.bikes || 0,
+                            commercial: dbData.commercial || 0,
+                            economy: dbData.economy || 0,
+                            premium: dbData.premium || 0,
+                            luxury: dbData.luxury || 0,
+                            ultra_luxury: dbData.ultra_luxury || 0,
+                            last_updated: dbData.last_updated
                         };
                         updateDashboardWithLiveData(parsedData);
                         return;
@@ -1340,12 +1343,12 @@ document.addEventListener('DOMContentLoaded', () => {
         state.stats.flowRate = data.flow_rate || 0.0;
 
         // Vehicle breakdown
-        state.stats.classes.economy.count = Number(data.bikes) || 0;
-        state.stats.classes.premium.count = Number(data.commercial) || 0;
-        state.stats.classes.luxury.count = Number(data.economy) || 0;
-        state.stats.classes.ultra.count = Number(data.premium) || 0;
-        state.stats.classes.bikes.count = Number(data.luxury) || 0;
-        state.stats.classes.commercial.count = Number(data.ultra_luxury) || 0;
+        state.stats.classes.economy.count = Number(data.bikes) || 0;       // Bike
+        state.stats.classes.premium.count = Number(data.commercial) || 0;  // Commercial
+        state.stats.classes.luxury.count = Number(data.economy) || 0;      // Economy
+        state.stats.classes.ultra.count = Number(data.premium) || 0;       // Premium
+        state.stats.classes.bikes.count = Number(data.luxury) || 0;        // Luxury
+        state.stats.classes.commercial.count = Number(data.ultra_luxury) || 0; // Ultra Luxury
 
         // Calculate percentages dynamically from total_vehicles
         const total = Number(data.total_vehicles) || 1;
