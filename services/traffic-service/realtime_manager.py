@@ -91,6 +91,9 @@ class RealtimeManager:
         return serialized
 
     async def start(self):
+        if self.is_running:
+            logger.warning("RealtimeManager is already running. Skipping duplicate start.")
+            return
         self.is_running = True
         self.loop = asyncio.get_running_loop()
         
@@ -99,9 +102,16 @@ class RealtimeManager:
         logger.info("RealtimeManager started with traffic simulator.")
 
     async def stop(self):
+        if not self.is_running and not self.simulator_task:
+            return
         self.is_running = False
         if self.simulator_task:
             self.simulator_task.cancel()
+            try:
+                await self.simulator_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            self.simulator_task = None
         logger.info("RealtimeManager stopped.")
 
     async def _simulation_loop(self):

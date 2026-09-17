@@ -1,0 +1,12 @@
+{
+  "include": [
+    "services",
+    "apps"
+  ],
+  "extraPaths": [
+    "services",
+    "services/location-service",
+    "services/traffic-service",
+    "services/api-gateway"
+  ]
+}
