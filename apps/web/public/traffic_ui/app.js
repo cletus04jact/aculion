@@ -348,14 +348,29 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Refresh and export buttons
-    elements.refreshBtn.addEventListener('click', () => {
-        elements.refreshBtn.querySelector('i').classList.add('fa-spin');
-        setTimeout(() => {
-            elements.refreshBtn.querySelector('i').classList.remove('fa-spin');
+    if (elements.refreshBtn) {
+        elements.refreshBtn.addEventListener('click', () => {
+            const icon = elements.refreshBtn.querySelector('svg, i, [data-lucide]');
+            if (icon) {
+                icon.classList.add('spin-animation');
+            }
+            try {
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({ type: 'ACULION_REFRESH_TRAFFIC_DATA' }, '*');
+                }
+            } catch (e) {
+                console.error("Error dispatching refresh request to parent:", e);
+            }
             fetchLatestData(state.filters.location);
-            showNotification("Live data refreshed");
-        }, 800);
-    });
+            setTimeout(() => {
+                if (icon) {
+                    icon.classList.remove('spin-animation');
+                }
+                fetchLatestData(state.filters.location);
+                showNotification("Live data refreshed");
+            }, 600);
+        });
+    }
 
     if (elements.exportBtn) {
         elements.exportBtn.addEventListener('click', () => {
@@ -1231,26 +1246,26 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Live Simulated Realtime Integration ---
     let sseInterval = null;
 
+    function setStatus(stateName, isDb = false) {
+        const indicator = document.getElementById('connectionStatusIndicator');
+        const statusText = document.getElementById('connectionStatusText');
+        if (!indicator || !statusText) return;
+
+        if (stateName === 'connected') {
+            indicator.className = 'status-indicator connected';
+            statusText.textContent = isDb ? 'CONNECTED (DATABASE)' : 'LIVE (DATABASE)';
+        } else if (stateName === 'reconnecting') {
+            indicator.className = 'status-indicator reconnecting';
+            statusText.textContent = 'CONNECTING...';
+        } else {
+            indicator.className = 'status-indicator disconnected';
+            statusText.textContent = 'DISCONNECTED';
+        }
+    }
+
     function connectToSSE(cameraCode) {
         if (sseInterval) {
             clearInterval(sseInterval);
-        }
-
-        const indicator = document.getElementById('connectionStatusIndicator');
-        const statusText = document.getElementById('connectionStatusText');
-
-        function setStatus(stateName, isDb = false) {
-            if (!indicator || !statusText) return;
-            if (stateName === 'connected') {
-                indicator.className = 'status-indicator status-online';
-                statusText.textContent = isDb ? 'CONNECTED (DATABASE)' : 'CONNECTED (REAL-TIME)';
-            } else if (stateName === 'reconnecting') {
-                indicator.className = 'status-indicator status-connecting';
-                statusText.textContent = 'CONNECTING...';
-            } else {
-                indicator.className = 'status-indicator status-offline';
-                statusText.textContent = 'DISCONNECTED';
-            }
         }
 
         setStatus('reconnecting');
@@ -1285,25 +1300,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            setStatus('connected', false);
-            let baseData = generateSimulatedData(cameraCode);
-            updateDashboardWithLiveData(baseData);
-        }, 300);
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({ type: 'ACULION_REFRESH_TRAFFIC_DATA' }, '*');
+            }
+
+            if (state.stats.totalVehicles === 0) {
+                setStatus('connected', false);
+                let baseData = generateSimulatedData(cameraCode);
+                updateDashboardWithLiveData(baseData);
+            } else {
+                setStatus('connected', true);
+            }
+        }, 150);
     }
 
     async function fetchLatestData(cameraCode) {
         try {
-            const indicator = document.getElementById('connectionStatusIndicator');
-            const statusText = document.getElementById('connectionStatusText');
             const stored = localStorage.getItem('aculion_traffic_overview');
             if (stored) {
                 try {
                     const dbData = JSON.parse(stored);
                     if (dbData && dbData.total_vehicles !== undefined) {
-                        if (indicator && statusText) {
-                            indicator.className = 'status-indicator status-online';
-                            statusText.textContent = 'CONNECTED (DATABASE)';
-                        }
+                        setStatus('connected', true);
                         const parsedData = {
                             total_vehicles: dbData.total_vehicles,
                             avg_exposure_time: Number(dbData.avg_exposure_time) || 0.0,
@@ -1325,8 +1343,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 } catch (e) {}
             }
 
-            const data = generateSimulatedData(cameraCode);
-            updateDashboardWithLiveData(data);
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({ type: 'ACULION_REFRESH_TRAFFIC_DATA' }, '*');
+            }
+
+            if (state.stats.totalVehicles === 0) {
+                const data = generateSimulatedData(cameraCode);
+                updateDashboardWithLiveData(data);
+            }
         } catch (e) {
             console.error("Error fetching latest traffic data:", e);
         }

@@ -227,146 +227,142 @@ export default function LiveDashboard({
   const [reportSuccess, setReportSuccess] = useState(false);
   const [reportsList, setReportsList] = useState([]);
 
-  useEffect(() => {
-    // Clear stale database traffic overview synchronously on billboard change
-    localStorage.removeItem('aculion_traffic_overview');
-    setDbTrafficData(null);
-    setLiveVehicles(0);
-    setLiveDwell(0);
-
+  const buildLiveAlerts = React.useCallback((telemetry) => {
     const code = selectedBillboard?.billboard_code || selectedBillboard?.id || 'ACU-BB-0004';
     const camCode = selectedBillboard?.camera_ff_code || 'CAM-FF-004';
     const bbName = selectedBillboard?.billboard_name || selectedBillboard?.name || 'Corridor Asset';
     const lat = (selectedBillboard?.latitude || 12.9010).toFixed(4);
     const lng = (selectedBillboard?.longitude || 80.2279).toFixed(4);
+    const flow = telemetry?.flow_rate || 84.5;
+    const peak = telemetry?.peak_traffic_hour || '06:00 PM – 07:00 PM';
+    const total = (telemetry?.total_vehicles || 17820).toLocaleString();
+
+    return [
+      {
+        id: 1,
+        type: 'INFO',
+        title: `Front Camera Stream Active (${camCode})`,
+        target: `${code} • 1080p 30fps Real-Time Stream Online`,
+        time: 'Active Now',
+        active: true
+      },
+      {
+        id: 2,
+        type: flow > 90 ? 'CRITICAL' : flow > 70 ? 'WARNING' : 'INFO',
+        title: `Mobility Flow Rate: ${flow} veh/min logged`,
+        target: `${code} • Real-time junction throughput (Total: ${total} veh)`,
+        time: '2 mins ago',
+        active: true
+      },
+      {
+        id: 3,
+        type: 'INFO',
+        title: `Peak Mobility Window Active (${peak})`,
+        target: `${bbName} • High audience attention & recall period`,
+        time: 'Today',
+        active: true
+      },
+      {
+        id: 4,
+        type: 'INFO',
+        title: `GPS Telemetry Locked (${lat}° N, ${lng}° E)`,
+        target: `${bbName} • Verified asset location on OOH Vector Map`,
+        time: 'Continuous',
+        active: true
+      }
+    ];
+  }, [selectedBillboard]);
+
+  const fetchDbTrafficOverview = React.useCallback(async (isSilent = false) => {
+    if (!isSilent) setIsTrafficLoading(true);
+    const bbCode = selectedBillboard?.billboard_code || selectedBillboard?.id;
+    try {
+      let data = null;
+
+      // 1. First attempt: match by billboard_code
+      if (bbCode) {
+        const res = await supabase
+          .from("traffic_overview")
+          .select("*")
+          .eq("billboard_code", bbCode)
+          .order("last_updated", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (res.data) data = res.data;
+      }
+
+      // 2. Second attempt: match by camera_ff_code if not found
+      if (!data && selectedBillboard?.camera_ff_code) {
+        const res = await supabase
+          .from("traffic_overview")
+          .select("*")
+          .eq("camera_ff_code", selectedBillboard.camera_ff_code)
+          .order("last_updated", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (res.data) data = res.data;
+      }
+
+      // 3. Third attempt: query most recent row with non-zero total_vehicles
+      if (!data || data.total_vehicles === 0) {
+        const res = await supabase
+          .from("traffic_overview")
+          .select("*")
+          .gt("total_vehicles", 0)
+          .order("last_updated", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (res.data) data = res.data;
+      }
+
+      // 4. Fourth fallback: query absolute latest record
+      if (!data) {
+        const res = await supabase
+          .from("traffic_overview")
+          .select("*")
+          .order("last_updated", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (res.data) data = res.data;
+      }
+
+      if (data) {
+        setDbTrafficData(data);
+        localStorage.setItem('aculion_traffic_overview', JSON.stringify(data));
+        setAlerts(buildLiveAlerts(data));
+        
+        if (data.total_vehicles !== undefined && data.total_vehicles !== null) {
+          setLiveVehicles(data.total_vehicles);
+        }
+        if (data.avg_exposure_time !== undefined && data.avg_exposure_time !== null) {
+          setLiveDwell(Number(data.avg_exposure_time));
+        }
+
+        // Broadcast to any embedded iframes (e.g. traffic_ui Audience Intelligence)
+        document.querySelectorAll('iframe').forEach(frame => {
+          frame.contentWindow?.postMessage({
+            type: 'ACULION_TRAFFIC_DATA_UPDATE',
+            data: data
+          }, '*');
+        });
+      }
+    } catch (err) {
+      console.error("[LiveDashboard] fetchDbTrafficOverview exception:", err);
+    } finally {
+      if (!isSilent) setIsTrafficLoading(false);
+    }
+  }, [selectedBillboard, buildLiveAlerts]);
+
+  useEffect(() => {
+    const code = selectedBillboard?.billboard_code || selectedBillboard?.id || 'ACU-BB-0004';
+    const bbName = selectedBillboard?.billboard_name || selectedBillboard?.name || 'Corridor Asset';
 
     setReportsList([
       { id: `REP-${code}-01`, name: `${bbName} Comprehensive Mobility & Reach Report`, format: 'PDF', date: new Date().toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }), size: '3.4 MB' },
       { id: `REP-${code}-02`, name: `${bbName} Monthly DOOH Audience & Valuation Summary`, format: 'PDF', date: new Date().toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }), size: '2.8 MB' }
     ]);
 
-    function buildLiveAlerts(telemetry) {
-      const flow = telemetry?.flow_rate || 84.5;
-      const peak = telemetry?.peak_traffic_hour || '06:00 PM – 07:00 PM';
-      const total = (telemetry?.total_vehicles || 17820).toLocaleString();
-
-      return [
-        {
-          id: 1,
-          type: 'INFO',
-          title: `Front Camera Stream Active (${camCode})`,
-          target: `${code} • 1080p 30fps Real-Time Stream Online`,
-          time: 'Active Now',
-          active: true
-        },
-        {
-          id: 2,
-          type: flow > 90 ? 'CRITICAL' : flow > 70 ? 'WARNING' : 'INFO',
-          title: `Mobility Flow Rate: ${flow} veh/min logged`,
-          target: `${code} • Real-time junction throughput (Total: ${total} veh)`,
-          time: '2 mins ago',
-          active: true
-        },
-        {
-          id: 3,
-          type: 'INFO',
-          title: `Peak Mobility Window Active (${peak})`,
-          target: `${bbName} • High audience attention & recall period`,
-          time: 'Today',
-          active: true
-        },
-        {
-          id: 4,
-          type: 'INFO',
-          title: `GPS Telemetry Locked (${lat}° N, ${lng}° E)`,
-          target: `${bbName} • Verified asset location on OOH Vector Map`,
-          time: 'Continuous',
-          active: true
-        }
-      ];
-    }
-
     setAlerts(buildLiveAlerts(null));
-
-    async function fetchDbTrafficOverview(isSilent = false) {
-      if (!isSilent) setIsTrafficLoading(true);
-      const bbCode = selectedBillboard?.billboard_code || selectedBillboard?.id;
-      try {
-        let data = null;
-
-        // 1. First attempt: match by billboard_code
-        if (bbCode) {
-          const res = await supabase
-            .from("traffic_overview")
-            .select("*")
-            .eq("billboard_code", bbCode)
-            .order("last_updated", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (res.data) data = res.data;
-        }
-
-        // 2. Second attempt: match by camera_ff_code if not found
-        if (!data && selectedBillboard?.camera_ff_code) {
-          const res = await supabase
-            .from("traffic_overview")
-            .select("*")
-            .eq("camera_ff_code", selectedBillboard.camera_ff_code)
-            .order("last_updated", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (res.data) data = res.data;
-        }
-
-        // 3. Third attempt: query most recent row with non-zero total_vehicles
-        if (!data || data.total_vehicles === 0) {
-          const res = await supabase
-            .from("traffic_overview")
-            .select("*")
-            .gt("total_vehicles", 0)
-            .order("last_updated", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (res.data) data = res.data;
-        }
-
-        // 4. Fourth fallback: query absolute latest record
-        if (!data) {
-          const res = await supabase
-            .from("traffic_overview")
-            .select("*")
-            .order("last_updated", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (res.data) data = res.data;
-        }
-
-        if (data) {
-          setDbTrafficData(data);
-          localStorage.setItem('aculion_traffic_overview', JSON.stringify(data));
-          setAlerts(buildLiveAlerts(data));
-          
-          if (data.total_vehicles !== undefined && data.total_vehicles !== null) {
-            setLiveVehicles(data.total_vehicles);
-          }
-          if (data.avg_exposure_time !== undefined && data.avg_exposure_time !== null) {
-            setLiveDwell(Number(data.avg_exposure_time));
-          }
-
-          // Broadcast to any embedded iframes (e.g. traffic_ui Audience Intelligence)
-          document.querySelectorAll('iframe').forEach(frame => {
-            frame.contentWindow?.postMessage({
-              type: 'ACULION_TRAFFIC_DATA_UPDATE',
-              data: data
-            }, '*');
-          });
-        }
-      } catch (err) {
-        console.error("[LiveDashboard] fetchDbTrafficOverview exception:", err);
-      } finally {
-        if (!isSilent) setIsTrafficLoading(false);
-      }
-    }
 
     fetchDbTrafficOverview(false);
 
@@ -377,7 +373,8 @@ export default function LiveDashboard({
     return () => {
       clearInterval(intervalId);
     };
-  }, [selectedBillboard]);
+  }, [selectedBillboard, fetchDbTrafficOverview, buildLiveAlerts]);
+
 
 
   // Historical trends granularity
@@ -490,16 +487,21 @@ export default function LiveDashboard({
     }
   };
 
-  // Listen for export report messages from iframe (e.g. from Audience Intelligence header button)
+  // Listen for export report and refresh messages from iframe (e.g. from Audience Intelligence header buttons)
   useEffect(() => {
-    const handleReportMsg = (e) => {
-      if (e.data && e.data.type === 'ACULION_GENERATE_REPORT_PDF') {
-        handleGenerateReport();
+    const handleIframeMsg = (e) => {
+      if (e.data) {
+        if (e.data.type === 'ACULION_GENERATE_REPORT_PDF') {
+          handleGenerateReport();
+        } else if (e.data.type === 'ACULION_REFRESH_TRAFFIC_DATA' || e.data.type === 'REQUEST_TRAFFIC_REFRESH') {
+          fetchDbTrafficOverview(false);
+        }
       }
     };
-    window.addEventListener('message', handleReportMsg);
-    return () => window.removeEventListener('message', handleReportMsg);
-  }, [dbTrafficData, selectedBillboard, user, reportType]);
+    window.addEventListener('message', handleIframeMsg);
+    return () => window.removeEventListener('message', handleIframeMsg);
+  }, [fetchDbTrafficOverview, dbTrafficData, selectedBillboard, user, reportType]);
+
 
   // Download restructured spacious 3-page report as high-quality PDF
   const downloadReportAsPDF = async (rep) => {
@@ -1916,7 +1918,7 @@ export default function LiveDashboard({
             ═══════════════════════════════════════════════════ */}
             {activeNav === 'traffic' && (
               <iframe
-                key={`${selectedBillboard?.billboard_code || selectedBillboard?.id || 'traffic-frame'}-${dbTrafficData ? 'data' : 'nodata'}`}
+                key={selectedBillboard?.billboard_code || selectedBillboard?.id || 'traffic-frame'}
                 src="/traffic_ui/index.html"
                 title="Audience Intelligence"
                 className="w-full h-full border-none"
