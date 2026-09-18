@@ -131,7 +131,7 @@
                             <h1>Traffic Intelligence</h1>
                             <div class="status-indicator connected" id="connectionStatusIndicator">
                                 <span class="status-dot"></span>
-                                <span class="status-text" id="connectionStatusText">CONNECTED (DATABASE)</span>
+                                <span class="status-text" id="connectionStatusText">CONNECTED</span>
                             </div>
                         </div>
                         <p class="subtitle">Real-time vehicle movement analytics and audience insights for Outdoor Media Intelligence.</p>
@@ -166,7 +166,10 @@
                     </div>
                     
                     <div class="header-actions">
-                        <span class="update-timestamp" id="lastUpdatedTime">Last updated: Just now</span>
+                        <span class="update-timestamp" id="lastUpdatedTime">Last updated at --:--:--</span>
+                        <button class="btn-icon-small" id="refreshBtn" title="Refresh Live Data (Auto-updates every 5s)" aria-label="Refresh data">
+                            <i data-lucide="refresh-cw"></i>
+                        </button>
                     </div>
                 </div>
             </header>

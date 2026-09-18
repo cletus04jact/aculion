@@ -368,7 +368,7 @@ export default function LiveDashboard({
 
     const intervalId = setInterval(() => {
       fetchDbTrafficOverview(true);
-    }, 7500);
+    }, 5000);
 
     return () => {
       clearInterval(intervalId);

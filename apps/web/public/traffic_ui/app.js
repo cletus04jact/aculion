@@ -152,8 +152,8 @@ document.addEventListener('DOMContentLoaded', () => {
         closeSidebarBtn: document.getElementById('closeSidebarBtn'),
         applyFiltersBtn: document.getElementById('applyFiltersBtn'),
         resetFiltersBtn: document.getElementById('resetFiltersBtn'),
-
-        // Selectors
+        refreshBtn: document.getElementById('refreshBtn'),
+        lastUpdatedTime: document.getElementById('lastUpdatedTime'),
         headerLocationSelect: document.getElementById('headerLocationSelect'),
         filterLocation: document.getElementById('filterLocation'),
         filterRoadType: document.getElementById('filterRoadType'),
@@ -353,14 +353,52 @@ document.addEventListener('DOMContentLoaded', () => {
         showNotification("Filters Reset to Defaults");
     });
 
+    let lastUpdatedTimestamp = new Date();
+
+    function formatLastUpdated(date = new Date()) {
+        lastUpdatedTimestamp = date;
+        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+        return `Last updated at ${timeStr}`;
+    }
+
+    // Small refresh button handler
+    if (elements.refreshBtn) {
+        elements.refreshBtn.addEventListener('click', async () => {
+            const icon = elements.refreshBtn.querySelector('svg, i, [data-lucide]');
+            if (icon) {
+                icon.classList.add('spin-animation');
+            }
+            try {
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({ type: 'ACULION_REFRESH_TRAFFIC_DATA' }, '*');
+                }
+            } catch (e) {
+                console.error("Error dispatching refresh request to parent:", e);
+            }
+
+            await fetchFromSupabaseDirectly();
+            fetchLatestData(state.filters.location);
+
+            setTimeout(() => {
+                if (icon) {
+                    icon.classList.remove('spin-animation');
+                }
+                if (elements.lastUpdatedTime) {
+                    elements.lastUpdatedTime.textContent = formatLastUpdated(new Date());
+                }
+            }, 600);
+        });
+    }
 
     function showNotification(msg) {
-        elements.lastUpdatedTime.textContent = msg;
-        elements.lastUpdatedTime.style.color = 'var(--color-cyan)';
-        setTimeout(() => {
-            elements.lastUpdatedTime.textContent = "Last updated: Just now";
-            elements.lastUpdatedTime.style.color = '';
-        }, 3000);
+        if (elements.lastUpdatedTime) {
+            elements.lastUpdatedTime.textContent = msg;
+            elements.lastUpdatedTime.style.color = 'var(--color-cyan)';
+            setTimeout(() => {
+                elements.lastUpdatedTime.textContent = formatLastUpdated(lastUpdatedTimestamp);
+                elements.lastUpdatedTime.style.color = '';
+            }, 3000);
+        }
     }
 
     // --- UI Values Update Binders ---
@@ -1205,11 +1243,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return null;
     }
 
-    // Auto-refresh data and update charts/UI every 7.5 seconds
+    // Auto-refresh data and update charts/UI every 5 seconds from database
     setInterval(() => {
         fetchFromSupabaseDirectly();
         fetchLatestData(state.filters.location);
-    }, 7500);
+    }, 5000);
 
     // Listen to parent frame updates
     window.addEventListener('storage', (e) => {
@@ -1238,7 +1276,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (stateName === 'connected') {
             indicator.className = 'status-indicator connected';
-            statusText.textContent = isDb ? 'CONNECTED (DATABASE)' : 'LIVE (DATABASE)';
+            statusText.textContent = isDb ? 'CONNECTED' : 'LIVE';
         } else if (stateName === 'reconnecting') {
             indicator.className = 'status-indicator reconnecting';
             statusText.textContent = 'CONNECTING...';
@@ -1379,7 +1417,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update timestamp
         if (elements.lastUpdatedTime) {
             const updatedDate = data.last_updated ? new Date(data.last_updated) : new Date();
-            elements.lastUpdatedTime.textContent = `Last updated: ${updatedDate.toLocaleTimeString()}`;
+            elements.lastUpdatedTime.textContent = formatLastUpdated(updatedDate);
         }
 
         if (elements.hudTime) {
@@ -1550,6 +1588,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     populateCameraDropdown();
     initCustomDropdowns();
+
+    if (elements.lastUpdatedTime) {
+        elements.lastUpdatedTime.textContent = formatLastUpdated(new Date());
+    }
 
     // Lucide Icons initialization
     if (window.lucide) {
