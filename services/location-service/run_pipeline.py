@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 # Add backend directory to path to enable package import
 sys.path.append(str(Path(__file__).resolve().parent))
-
+print("a")
 from ingestion.logger import logger
 from ingestion.discover_files import scan_and_discover_files, get_ingestion_status
 from ingestion.schema_validator import SchemaValidator
