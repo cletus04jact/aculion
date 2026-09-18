@@ -11,20 +11,30 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const data = JSON.parse(stored);
                 if (data && data.total_vehicles !== undefined) {
+                    const bikeCount = Number(data.bikes) || 0;
+                    const commercialCount = Number(data.commercial) || 0;
+                    const economyCount = Number(data.economy) || 0;
+                    const premiumCount = Number(data.premium) || 0;
+                    const luxuryCount = Number(data.luxury) || 0;
+                    const ultraLuxuryCount = Number(data.ultra_luxury) || 0;
+                    const calculatedSum = bikeCount + commercialCount + economyCount + premiumCount + luxuryCount + ultraLuxuryCount;
+                    const totalVehicles = Number(data.total_vehicles) || calculatedSum || 0;
+                    const totalDivisor = calculatedSum > 0 ? calculatedSum : (totalVehicles > 0 ? totalVehicles : 1);
+
                     return {
-                        totalVehicles: data.total_vehicles,
+                        totalVehicles: totalVehicles,
                         avgDwellTime: Number(data.avg_exposure_time) || 14.8,
                         peakHour: data.peak_traffic_hour || '6:00 PM – 7:00 PM',
                         estimatedReach: data.estimated_reach || 42500,
                         flowRate: Number(data.flow_rate) || 84.5,
                         accuracy: 98.7,
                         classes: {
-                            economy: { name: 'Bike', count: data.bikes || 0, pct: Math.round(((data.bikes || 0) / (data.total_vehicles || 1)) * 100) || 0, color: '#1E88FF' },
-                            premium: { name: 'Commercial', count: data.commercial || 0, pct: Math.round(((data.commercial || 0) / (data.total_vehicles || 1)) * 100) || 0, color: '#00C4FF' },
-                            luxury: { name: 'Economy', count: data.economy || 0, pct: Math.round(((data.economy || 0) / (data.total_vehicles || 1)) * 100) || 0, color: '#8B5CF6' },
-                            ultra: { name: 'Premium', count: data.premium || 0, pct: Math.round(((data.premium || 0) / (data.total_vehicles || 1)) * 100) || 0, color: '#F59E0B' },
-                            bikes: { name: 'Luxury', count: data.luxury || 0, pct: Math.round(((data.luxury || 0) / (data.total_vehicles || 1)) * 100) || 0, color: '#10B981' },
-                            commercial: { name: 'Ultra Luxury', count: data.ultra_luxury || 0, pct: Math.round(((data.ultra_luxury || 0) / (data.total_vehicles || 1)) * 100) || 0, color: '#F97316' }
+                            economy: { name: 'Bike', count: bikeCount, pct: Math.round((bikeCount / totalDivisor) * 100) || 0, color: '#1E88FF' },
+                            premium: { name: 'Commercial', count: commercialCount, pct: Math.round((commercialCount / totalDivisor) * 100) || 0, color: '#00C4FF' },
+                            luxury: { name: 'Economy', count: economyCount, pct: Math.round((economyCount / totalDivisor) * 100) || 0, color: '#8B5CF6' },
+                            ultra: { name: 'Premium', count: premiumCount, pct: Math.round((premiumCount / totalDivisor) * 100) || 0, color: '#F59E0B' },
+                            bikes: { name: 'Luxury', count: luxuryCount, pct: Math.round((luxuryCount / totalDivisor) * 100) || 0, color: '#10B981' },
+                            commercial: { name: 'Ultra Luxury', count: ultraLuxuryCount, pct: Math.round((ultraLuxuryCount / totalDivisor) * 100) || 0, color: '#F97316' }
                         },
                         dwellStats: {
                             avg: Number(data.avg_exposure_time) || 14.8,
@@ -45,8 +55,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
-        // No database data available: set database-backed fields to 0 / N/A,
-        // and keep non-database-backed placeholder fields as their static values.
         return {
             totalVehicles: 0,
             avgDwellTime: 0.0,
@@ -349,7 +357,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Refresh and export buttons
     if (elements.refreshBtn) {
-        elements.refreshBtn.addEventListener('click', () => {
+        elements.refreshBtn.addEventListener('click', async () => {
             const icon = elements.refreshBtn.querySelector('svg, i, [data-lucide]');
             if (icon) {
                 icon.classList.add('spin-animation');
@@ -361,12 +369,14 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (e) {
                 console.error("Error dispatching refresh request to parent:", e);
             }
+
+            await fetchFromSupabaseDirectly();
             fetchLatestData(state.filters.location);
+
             setTimeout(() => {
                 if (icon) {
                     icon.classList.remove('spin-animation');
                 }
-                fetchLatestData(state.filters.location);
                 showNotification("Live data refreshed");
             }, 600);
         });
@@ -649,8 +659,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                 show: true,
                                 label: 'Total Vehicles',
                                 color: '#94a3b8',
-                                formatter: function (w) {
-                                    return w.globals.seriesTotals.reduce((a, b) => a + b, 0).toLocaleString();
+                                formatter: function () {
+                                    return Number(state.stats.totalVehicles || 0).toLocaleString();
                                 }
                             }
                         }
@@ -1207,8 +1217,38 @@ document.addEventListener('DOMContentLoaded', () => {
     // Connect immediately on startup
     connectToSSE(state.filters.location || 'active-cam');
 
+    // --- Direct Supabase REST Integration ---
+    const SUPABASE_REST_URL = 'https://buqtshfptmqieaqcghfx.supabase.co/rest/v1/traffic_overview?select=*&order=last_updated.desc&limit=1';
+    const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ1cXRzaGZwdG1xaWVhcWNnaGZ4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MzkwOTYyMiwiZXhwIjoyMDk5NDg1NjIyfQ.f12uC9oK_BzLzlXgy_5ybUAgdHJTY6N7E5VWXXmgr5Q';
+
+    async function fetchFromSupabaseDirectly() {
+        try {
+            const response = await fetch(SUPABASE_REST_URL, {
+                headers: {
+                    'apikey': SUPABASE_SERVICE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                if (data && data.length > 0) {
+                    const row = data[0];
+                    localStorage.setItem('aculion_traffic_overview', JSON.stringify(row));
+                    updateDashboardWithLiveData(row);
+                    setStatus('connected', true);
+                    return row;
+                }
+            }
+        } catch (err) {
+            console.warn("Direct Supabase REST fetch note:", err);
+        }
+        return null;
+    }
+
     // Auto-refresh data and update charts/UI every 7.5 seconds
     setInterval(() => {
+        fetchFromSupabaseDirectly();
         fetchLatestData(state.filters.location);
     }, 7500);
 
@@ -1223,22 +1263,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.data && (e.data.type === 'ACULION_TRAFFIC_UPDATE' || e.data.type === 'ACULION_TRAFFIC_DATA_UPDATE')) {
             const payload = e.data.payload || e.data.data;
             if (payload) {
-                const parsedData = {
-                    total_vehicles: payload.total_vehicles,
-                    avg_exposure_time: Number(payload.avg_exposure_time) || 0.0,
-                    max_exposure_time: Number(payload.max_exposure_time) || 0.0,
-                    peak_traffic_hour: payload.peak_traffic_hour || 'N/A',
-                    estimated_reach: payload.estimated_reach || 0,
-                    flow_rate: Number(payload.flow_rate) || 0.0,
-                    bikes: payload.bikes || 0,
-                    commercial: payload.commercial || 0,
-                    economy: payload.economy || 0,
-                    premium: payload.premium || 0,
-                    luxury: payload.luxury || 0,
-                    ultra_luxury: payload.ultra_luxury || 0,
-                    last_updated: payload.last_updated
-                };
-                updateDashboardWithLiveData(parsedData);
+                updateDashboardWithLiveData(payload);
+                setStatus('connected', true);
             }
         }
     });
@@ -1268,7 +1294,8 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(sseInterval);
         }
 
-        setStatus('reconnecting');
+        setStatus('connected', true);
+        fetchFromSupabaseDirectly();
 
         setTimeout(() => {
             const stored = localStorage.getItem('aculion_traffic_overview');
@@ -1277,22 +1304,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const dbData = JSON.parse(stored);
                     if (dbData && dbData.total_vehicles !== undefined) {
                         setStatus('connected', true);
-                        const parsedData = {
-                            total_vehicles: dbData.total_vehicles,
-                            avg_exposure_time: Number(dbData.avg_exposure_time) || 0.0,
-                            max_exposure_time: Number(dbData.max_exposure_time) || 0.0,
-                            peak_traffic_hour: dbData.peak_traffic_hour || 'N/A',
-                            estimated_reach: dbData.estimated_reach || 0,
-                            flow_rate: Number(dbData.flow_rate) || 0.0,
-                            bikes: dbData.bikes || 0,
-                            commercial: dbData.commercial || 0,
-                            economy: dbData.economy || 0,
-                            premium: dbData.premium || 0,
-                            luxury: dbData.luxury || 0,
-                            ultra_luxury: dbData.ultra_luxury || 0,
-                            last_updated: dbData.last_updated
-                        };
-                        updateDashboardWithLiveData(parsedData);
+                        updateDashboardWithLiveData(dbData);
                         return;
                     }
                 } catch (e) {
@@ -1303,14 +1315,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (window.parent && window.parent !== window) {
                 window.parent.postMessage({ type: 'ACULION_REFRESH_TRAFFIC_DATA' }, '*');
             }
-
-            if (state.stats.totalVehicles === 0) {
-                setStatus('connected', false);
-                let baseData = generateSimulatedData(cameraCode);
-                updateDashboardWithLiveData(baseData);
-            } else {
-                setStatus('connected', true);
-            }
+            setStatus('connected', true);
         }, 150);
     }
 
@@ -1322,22 +1327,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const dbData = JSON.parse(stored);
                     if (dbData && dbData.total_vehicles !== undefined) {
                         setStatus('connected', true);
-                        const parsedData = {
-                            total_vehicles: dbData.total_vehicles,
-                            avg_exposure_time: Number(dbData.avg_exposure_time) || 0.0,
-                            max_exposure_time: Number(dbData.max_exposure_time) || 0.0,
-                            peak_traffic_hour: dbData.peak_traffic_hour || 'N/A',
-                            estimated_reach: dbData.estimated_reach || 0,
-                            flow_rate: Number(dbData.flow_rate) || 0.0,
-                            bikes: dbData.bikes || 0,
-                            commercial: dbData.commercial || 0,
-                            economy: dbData.economy || 0,
-                            premium: dbData.premium || 0,
-                            luxury: dbData.luxury || 0,
-                            ultra_luxury: dbData.ultra_luxury || 0,
-                            last_updated: dbData.last_updated
-                        };
-                        updateDashboardWithLiveData(parsedData);
+                        updateDashboardWithLiveData(dbData);
                         return;
                     }
                 } catch (e) {}
@@ -1347,10 +1337,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.parent.postMessage({ type: 'ACULION_REFRESH_TRAFFIC_DATA' }, '*');
             }
 
-            if (state.stats.totalVehicles === 0) {
-                const data = generateSimulatedData(cameraCode);
-                updateDashboardWithLiveData(data);
-            }
+            await fetchFromSupabaseDirectly();
         } catch (e) {
             console.error("Error fetching latest traffic data:", e);
         }
@@ -1359,26 +1346,35 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateDashboardWithLiveData(data) {
         if (!data) return;
 
-        // Map fields
-        state.stats.totalVehicles = data.total_vehicles || 0;
-        state.stats.avgDwellTime = data.avg_exposure_time || 0.0;
+        // Vehicle breakdown
+        const bikeCount = Number(data.bikes) || 0;
+        const commercialCount = Number(data.commercial) || 0;
+        const economyCount = Number(data.economy) || 0;
+        const premiumCount = Number(data.premium) || 0;
+        const luxuryCount = Number(data.luxury) || 0;
+        const ultraLuxuryCount = Number(data.ultra_luxury) || 0;
+        const calculatedSum = bikeCount + commercialCount + economyCount + premiumCount + luxuryCount + ultraLuxuryCount;
+        const totalVehicles = Number(data.total_vehicles) || calculatedSum || 0;
+
+        // Unified Total Vehicles
+        state.stats.totalVehicles = totalVehicles;
+        state.stats.avgDwellTime = Number(data.avg_exposure_time) || 0.0;
         state.stats.peakHour = data.peak_traffic_hour || 'N/A';
         state.stats.estimatedReach = data.estimated_reach || 0;
-        state.stats.flowRate = data.flow_rate || 0.0;
+        state.stats.flowRate = Number(data.flow_rate) || 0.0;
 
-        // Vehicle breakdown
-        state.stats.classes.economy.count = Number(data.bikes) || 0;       // Bike
-        state.stats.classes.premium.count = Number(data.commercial) || 0;  // Commercial
-        state.stats.classes.luxury.count = Number(data.economy) || 0;      // Economy
-        state.stats.classes.ultra.count = Number(data.premium) || 0;       // Premium
-        state.stats.classes.bikes.count = Number(data.luxury) || 0;        // Luxury
-        state.stats.classes.commercial.count = Number(data.ultra_luxury) || 0; // Ultra Luxury
+        state.stats.classes.economy.count = bikeCount;          // Bike
+        state.stats.classes.premium.count = commercialCount;     // Commercial
+        state.stats.classes.luxury.count = economyCount;         // Economy
+        state.stats.classes.ultra.count = premiumCount;          // Premium
+        state.stats.classes.bikes.count = luxuryCount;           // Luxury
+        state.stats.classes.commercial.count = ultraLuxuryCount; // Ultra Luxury
 
-        // Calculate percentages dynamically from total_vehicles
-        const total = Number(data.total_vehicles) || 1;
+        // Calculate percentages dynamically from sum
+        const totalDivisor = calculatedSum > 0 ? calculatedSum : (totalVehicles > 0 ? totalVehicles : 1);
         Object.keys(state.stats.classes).forEach(key => {
             const count = state.stats.classes[key].count;
-            state.stats.classes[key].pct = Math.round((count / total) * 100);
+            state.stats.classes[key].pct = Math.round((count / totalDivisor) * 100);
         });
 
         if (state.stats.dwellStats) {
@@ -1399,7 +1395,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (elements.kpiVehicles) elements.kpiVehicles.textContent = formatIndianNumber(state.stats.totalVehicles);
-        if (elements.kpiDwell) elements.kpiDwell.textContent = `${state.stats.avgDwellTime.toFixed(1)} sec`;
+        if (elements.kpiDwell) elements.kpiDwell.textContent = `${state.stats.avgDwellTime.toFixed(2)} sec`;
         if (elements.kpiReach) elements.kpiReach.textContent = formatIndianNumber(state.stats.estimatedReach);
         if (elements.kpiFlow) elements.kpiFlow.textContent = `${state.stats.flowRate.toFixed(1)} / min`;
         if (elements.kpiPeak) elements.kpiPeak.textContent = state.stats.peakHour;
@@ -1418,6 +1414,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        // Set status to connected
+        setStatus('connected', true);
+
         // Update timestamp
         if (elements.lastUpdatedTime) {
             const updatedDate = data.last_updated ? new Date(data.last_updated) : new Date();
@@ -1429,7 +1428,7 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.hudTime.textContent = updatedDate.toISOString().replace('T', ' ').substring(0, 19);
         }
 
-        // Refresh Donut Chart
+        // Refresh Donut Chart and synchronize center label with KPI
         if (state.charts.donut) {
             state.charts.donut.updateSeries([
                 state.stats.classes.economy.count,
@@ -1439,6 +1438,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.stats.classes.bikes.count,
                 state.stats.classes.commercial.count
             ]);
+            state.charts.donut.updateOptions({
+                plotOptions: {
+                    pie: {
+                        donut: {
+                            labels: {
+                                total: {
+                                    formatter: function () {
+                                        return formatIndianNumber(state.stats.totalVehicles);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
         }
 
         // Refresh Traffic Trend Chart series scaled to 15-min intervals
