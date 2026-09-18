@@ -152,8 +152,6 @@ document.addEventListener('DOMContentLoaded', () => {
         closeSidebarBtn: document.getElementById('closeSidebarBtn'),
         applyFiltersBtn: document.getElementById('applyFiltersBtn'),
         resetFiltersBtn: document.getElementById('resetFiltersBtn'),
-        refreshBtn: document.getElementById('refreshBtn'),
-        exportBtn: document.getElementById('exportBtn'),
 
         // Selectors
         headerLocationSelect: document.getElementById('headerLocationSelect'),
@@ -355,45 +353,6 @@ document.addEventListener('DOMContentLoaded', () => {
         showNotification("Filters Reset to Defaults");
     });
 
-    // Refresh and export buttons
-    if (elements.refreshBtn) {
-        elements.refreshBtn.addEventListener('click', async () => {
-            const icon = elements.refreshBtn.querySelector('svg, i, [data-lucide]');
-            if (icon) {
-                icon.classList.add('spin-animation');
-            }
-            try {
-                if (window.parent && window.parent !== window) {
-                    window.parent.postMessage({ type: 'ACULION_REFRESH_TRAFFIC_DATA' }, '*');
-                }
-            } catch (e) {
-                console.error("Error dispatching refresh request to parent:", e);
-            }
-
-            await fetchFromSupabaseDirectly();
-            fetchLatestData(state.filters.location);
-
-            setTimeout(() => {
-                if (icon) {
-                    icon.classList.remove('spin-animation');
-                }
-                showNotification("Live data refreshed");
-            }, 600);
-        });
-    }
-
-    if (elements.exportBtn) {
-        elements.exportBtn.addEventListener('click', () => {
-            showNotification("Generating & downloading PDF report...", "success");
-            try {
-                if (window.parent && window.parent !== window) {
-                    window.parent.postMessage({ type: 'ACULION_GENERATE_REPORT_PDF' }, '*');
-                }
-            } catch (e) {
-                console.error("Error dispatching report request:", e);
-            }
-        });
-    }
 
     function showNotification(msg) {
         elements.lastUpdatedTime.textContent = msg;
