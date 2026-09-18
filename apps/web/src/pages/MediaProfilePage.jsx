@@ -3,7 +3,7 @@ import newLogo from '../assets/aculion_logo_transparent.png';
 import { billboardService } from '../services/billboard.service';
 import { supabase } from '../services/supabase';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
 export default function MediaProfilePage({
   user,

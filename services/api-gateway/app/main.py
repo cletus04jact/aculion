@@ -30,8 +30,26 @@ app = FastAPI(
 )
 
 # CORS setup
-allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:5176")
-allowed_origins = [orig.strip() for orig in allowed_origins_str.split(",") if orig.strip()]
+default_origins = [
+    "http://localhost:5173",
+    "http://localhost:5176",
+    "https://www.aculion.com",
+    "https://aculion.com"
+]
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
+frontend_url_env = os.getenv("FRONTEND_URL", "")
+
+allowed_origins_set = set(default_origins)
+if allowed_origins_env:
+    for orig in allowed_origins_env.split(","):
+        if orig.strip():
+            allowed_origins_set.add(orig.strip())
+if frontend_url_env:
+    for orig in frontend_url_env.split(","):
+        if orig.strip():
+            allowed_origins_set.add(orig.strip())
+
+allowed_origins = sorted(list(allowed_origins_set))
 
 app.add_middleware(
     CORSMiddleware,
@@ -225,3 +243,9 @@ async def route_traffic(path: str, request: Request):
     path_in_service = request.url.path.replace("/api/traffic", "/traffic")
     target_url = f"{TRAFFIC_SERVICE_URL}{path_in_service}"
     return await proxy_request(target_url, request, "traffic-service")
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 8080))
+    logger.info(f"Starting API Gateway on port {port}...")
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=False)

@@ -12,12 +12,12 @@ from supabase import create_client, Client
 
 load_dotenv()
 
-SUPABASE_URL = "https://buqtshfptmqieaqcghfx.supabase.co"
-SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ1cXRzaGZwdG1xaWVhcWNnaGZ4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MzkwOTYyMiwiZXhwIjoyMDk5NDg1NjIyfQ.f12uC9oK_BzLzlXgy_5ybUAgdHJTY6N7E5VWXXmgr5Q"
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://buqtshfptmqieaqcghfx.supabase.co")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", os.getenv("SUPABASE_KEY", ""))
 
 if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
     raise ValueError(
-        "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env"
+        "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment variables or .env"
     )
 
 supabase: Client = create_client(

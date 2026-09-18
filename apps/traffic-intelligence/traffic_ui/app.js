@@ -1,8 +1,12 @@
 // ACULION Traffic Intelligence Dashboard Controller
 
-const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-    ? 'http://localhost:8080' 
-    : 'https://api.aculion.com');
+const urlParams = new URLSearchParams(window.location.search);
+const API_BASE = (
+    urlParams.get('api') ||
+    window.__ACULION_API_BASE__ ||
+    (window.parent && window.parent !== window ? window.parent.__ACULION_API_BASE__ : null) ||
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:8080' : '')
+);
 
 document.addEventListener('DOMContentLoaded', () => {
     // Extract active billboard details from URL parameters

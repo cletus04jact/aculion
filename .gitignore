@@ -2,23 +2,34 @@
 node_modules/
 .venv/
 venv/
+env/
 
 # Build & Cache Outputs
 dist/
+dist-ssr/
 .next/
 .vite/
 *.tsbuildinfo
 cache/
 logs/
+*.log
 scratch/
 __pycache__/
 *.pyc
+.pytest_cache/
 
-# Environment Files
+# Environment Files — NEVER commit these
 .env
-.env.local
-.env.production
+.env.*
+.env*.local
+!.env.example
+!**/.env.example
 
-# System Files
+# Vercel & Deployment
+.vercel/
+
+# System & IDE Files
 .DS_Store
 Thumbs.db
+.vscode/
+.idea/

@@ -10,8 +10,10 @@
     "dev:location": "cd services/location-service && python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload",
     "dev:traffic": "cd services/traffic-service && python -m uvicorn main:app --host 0.0.0.0 --port 8095 --reload",
     "dev:traffic-ui": "cd apps/traffic-intelligence/traffic_ui && npm run dev -- --port 5176",
+    "dev:backend": "cd services && python -m uvicorn main:app --host 0.0.0.0 --port 8080 --reload",
     "install:frontend": "cd apps/web && npm install",
     "install:backend": "cd services/api-gateway && pip install -r requirements.txt && cd ../location-service && pip install -r requirements.txt && cd ../traffic-service && pip install -r requirements.txt",
+    "install:unified": "cd services && pip install -r requirements.txt",
     "setup": "npm run install:frontend && npm run install:backend"
   },
   "devDependencies": {

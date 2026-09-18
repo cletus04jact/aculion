@@ -23,6 +23,8 @@ if not DATABASE_URL:
     from urllib.parse import quote_plus
     DATABASE_URL = f"postgresql://{DB_USER}:{quote_plus(DB_PASSWORD)}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 else:
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = "postgresql://" + DATABASE_URL[len("postgres://"):]
     # Defensive parsing for passwords containing special characters (like '@')
     if DATABASE_URL.startswith("postgresql://"):
         try:
