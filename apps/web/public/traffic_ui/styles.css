@@ -618,42 +618,46 @@ h1, h2, h3, h4, .kpi-value, .brand-name {
     height: 28px;
     padding: 0;
     border-radius: 7px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--border-color);
-    color: var(--text-secondary);
+    background: rgba(30, 136, 255, 0.08);
+    border: 1px solid rgba(30, 136, 255, 0.25);
+    color: var(--color-cyan, #00f0ff);
     cursor: pointer;
     transition: var(--transition-smooth);
     outline: none;
+    flex-shrink: 0;
 }
 
 .btn-icon-small:hover {
-    background: rgba(30, 136, 255, 0.18);
-    border-color: rgba(30, 136, 255, 0.45);
-    color: var(--color-cyan);
+    background: rgba(30, 136, 255, 0.25);
+    border-color: rgba(30, 136, 255, 0.6);
+    color: #ffffff;
     transform: translateY(-1px);
-    box-shadow: 0 0 10px rgba(30, 136, 255, 0.2);
+    box-shadow: 0 0 12px rgba(30, 136, 255, 0.35);
 }
 
 .btn-icon-small:active {
-    transform: scale(0.94);
+    transform: scale(0.92);
 }
 
-.btn-icon-small svg, .btn-icon-small i {
+.btn-icon-small svg, .btn-icon-small .refresh-icon, .btn-icon-small i {
     width: 14px;
     height: 14px;
+    stroke: currentColor;
+    display: block;
+    transform-origin: center center;
 }
 
 @keyframes spin {
-    from {
+    0% {
         transform: rotate(0deg);
     }
-    to {
+    100% {
         transform: rotate(360deg);
     }
 }
 
 .spin-animation {
-    animation: spin 0.75s linear infinite;
+    animation: spin 0.65s ease-in-out;
 }
 
 /* --- KPI Grid Section --- */
