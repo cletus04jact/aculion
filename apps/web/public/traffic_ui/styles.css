@@ -431,6 +431,19 @@ h1, h2, h3, h4, .kpi-value, .brand-name {
     color: var(--color-red);
 }
 
+.status-indicator.offline {
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+}
+.status-indicator.offline .status-dot {
+    background-color: var(--color-orange);
+    box-shadow: 0 0 8px var(--color-orange);
+    animation: none;
+}
+.status-indicator.offline .status-text {
+    color: var(--color-orange);
+}
+
 .subtitle {
     font-size: 14px;
     color: var(--text-secondary);
@@ -752,6 +765,11 @@ h1, h2, h3, h4, .kpi-value, .brand-name {
 .trend-down {
     color: var(--color-red);
     background: rgba(239, 68, 68, 0.08);
+}
+
+.trend-neutral {
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .kpi-trend i {

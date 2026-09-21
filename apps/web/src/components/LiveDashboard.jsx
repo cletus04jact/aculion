@@ -292,11 +292,14 @@ export default function LiveDashboard({
         return;
       }
 
-      // STRICT QUERY: Filter exclusively by the selected billboard_code
+      const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+
+      // STRICT QUERY: Filter exclusively by the selected billboard_code and stat_date
       const res = await supabase
         .from("traffic_overview")
         .select("*")
         .eq("billboard_code", targetBbCode)
+        .eq("stat_date", todayIST)
         .order("last_updated", { ascending: false })
         .limit(1)
         .maybeSingle();

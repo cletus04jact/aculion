@@ -225,6 +225,64 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchFromSupabaseDirectly(activeBillboardCode);
     }
 
+    // --- IST Timezone Date Helpers ---
+    function getTodayIST() {
+        return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    }
+
+    function getYesterdayIST(baseDateStr) {
+        const d = baseDateStr ? new Date(baseDateStr + 'T12:00:00+05:30') : new Date();
+        d.setDate(d.getDate() - 1);
+        return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d);
+    }
+
+    function formatDateDisplayIST(dateStr) {
+        if (!dateStr) return 'Today, Real-time Feed';
+        const today = getTodayIST();
+        if (dateStr === today) return 'Today, Real-time Feed';
+        const yesterday = getYesterdayIST(today);
+        if (dateStr === yesterday) return `Yesterday (${dateStr})`;
+        return `Date: ${dateStr}`;
+    }
+
+    let selectedDate = getTodayIST();
+    let currentTrackedDay = getTodayIST();
+
+    // Date range picker click & change listeners
+    const dateRangeBox = document.getElementById('dateRangeSelectorBox');
+    const datePickerInput = document.getElementById('datePickerInput');
+    const dateRangeDisplay = document.getElementById('dateRangeDisplay');
+
+    if (dateRangeBox && datePickerInput) {
+        dateRangeBox.addEventListener('click', (e) => {
+            e.preventDefault();
+            try {
+                if (datePickerInput.showPicker) {
+                    datePickerInput.showPicker();
+                } else {
+                    datePickerInput.focus();
+                    datePickerInput.click();
+                }
+            } catch (err) {
+                datePickerInput.click();
+            }
+        });
+
+        datePickerInput.addEventListener('change', (e) => {
+            const picked = e.target.value;
+            if (picked) {
+                selectedDate = picked;
+                if (dateRangeDisplay) {
+                    dateRangeDisplay.textContent = formatDateDisplayIST(selectedDate);
+                }
+                if (elements.filterDateRange) {
+                    elements.filterDateRange.value = (selectedDate === getTodayIST()) ? 'today' : (selectedDate === getYesterdayIST(getTodayIST()) ? 'yesterday' : 'custom');
+                }
+                fetchFromSupabaseDirectly(activeBillboardCode);
+            }
+        });
+    }
+
     // --- Filters Submission ---
     if (elements.applyFiltersBtn) {
         elements.applyFiltersBtn.addEventListener('click', () => {
@@ -233,7 +291,17 @@ document.addEventListener('DOMContentLoaded', () => {
             // Grab values
             if (elements.filterLocation) state.filters.location = elements.filterLocation.value;
             if (elements.filterRoadType) state.filters.roadType = elements.filterRoadType.value;
-            if (elements.filterDateRange) state.filters.dateRange = elements.filterDateRange.value;
+            if (elements.filterDateRange) {
+                state.filters.dateRange = elements.filterDateRange.value;
+                if (state.filters.dateRange === 'today') {
+                    selectedDate = getTodayIST();
+                } else if (state.filters.dateRange === 'yesterday') {
+                    selectedDate = getYesterdayIST(getTodayIST());
+                }
+                if (dateRangeDisplay) {
+                    dateRangeDisplay.textContent = formatDateDisplayIST(selectedDate);
+                }
+            }
             if (elements.filterTimeInterval) state.filters.timeInterval = elements.filterTimeInterval.value;
             if (elements.filterDayType) state.filters.dayType = elements.filterDayType.value;
             if (elements.filterDensity) state.filters.density = elements.filterDensity.value;
@@ -262,6 +330,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (elements.filterRoadType) elements.filterRoadType.value = 'all';
             if (elements.filterDateRange) elements.filterDateRange.value = 'today';
+            selectedDate = getTodayIST();
+            if (dateRangeDisplay) {
+                dateRangeDisplay.textContent = formatDateDisplayIST(selectedDate);
+            }
             if (elements.filterTimeInterval) elements.filterTimeInterval.value = '1h';
             if (elements.filterDayType) elements.filterDayType.value = 'all';
             if (elements.filterDensity) elements.filterDensity.value = 'all';
@@ -285,7 +357,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function formatLastUpdated(date = new Date()) {
         lastUpdatedTimestamp = date;
-        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+        const timeStr = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Kolkata',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+        }).format(date);
         return `Last updated at ${timeStr}`;
     }
 
@@ -1036,6 +1114,46 @@ document.addEventListener('DOMContentLoaded', () => {
     const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ1cXRzaGZwdG1xaWVhcWNnaGZ4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MzkwOTYyMiwiZXhwIjoyMDk5NDg1NjIyfQ.f12uC9oK_BzLzlXgy_5ybUAgdHJTY6N7E5VWXXmgr5Q';
     let isFetchingDirectly = false;
 
+    // Helper to calculate and update KPI percentage change badges
+    function updateKpiBadge(trendElId, wrapperElId, iconElId, currentVal, prevVal) {
+        const trendEl = document.getElementById(trendElId);
+        const wrapperEl = wrapperElId ? document.getElementById(wrapperElId) : trendEl?.parentElement;
+        const iconEl = iconElId ? document.getElementById(iconElId) : wrapperEl?.querySelector('i, svg');
+        if (!trendEl) return;
+
+        const c = Number(currentVal);
+        const p = Number(prevVal);
+
+        if (isNaN(p) || p === 0 || isNaN(c) || c === 0) {
+            trendEl.textContent = '--';
+            if (wrapperEl) {
+                wrapperEl.className = 'kpi-trend trend-neutral';
+            }
+            return;
+        }
+
+        const diff = c - p;
+        const pct = Math.abs((diff / p) * 100).toFixed(1);
+
+        if (diff >= 0) {
+            trendEl.textContent = `+${pct}%`;
+            if (wrapperEl) {
+                wrapperEl.className = 'kpi-trend trend-up';
+            }
+            if (iconEl) {
+                iconEl.setAttribute('data-lucide', 'trending-up');
+            }
+        } else {
+            trendEl.textContent = `-${pct}%`;
+            if (wrapperEl) {
+                wrapperEl.className = 'kpi-trend trend-down';
+            }
+            if (iconEl) {
+                iconEl.setAttribute('data-lucide', 'trending-down');
+            }
+        }
+    }
+
     async function fetchFromSupabaseDirectly(overrideCode) {
         if (isFetchingDirectly) return null;
         isFetchingDirectly = true;
@@ -1050,29 +1168,82 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const queryUrl = `https://buqtshfptmqieaqcghfx.supabase.co/rest/v1/traffic_overview?select=*&billboard_code=eq.${encodeURIComponent(cleanCode)}&order=last_updated.desc&limit=1&_nocache=${Date.now()}`;
-            const response = await fetch(queryUrl, {
-                cache: 'no-store',
-                headers: {
-                    'apikey': SUPABASE_SERVICE_KEY,
-                    'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-                    'Content-Type': 'application/json'
+            // Check for midnight rollover in IST if tracking today
+            const checkToday = getTodayIST();
+            if (selectedDate === currentTrackedDay && checkToday !== currentTrackedDay) {
+                currentTrackedDay = checkToday;
+                selectedDate = checkToday;
+                if (dateRangeDisplay) {
+                    dateRangeDisplay.textContent = 'Today, Real-time Feed';
                 }
-            });
+            }
+
+            // Query selected date row for the active billboard
+            const queryUrl = `https://buqtshfptmqieaqcghfx.supabase.co/rest/v1/traffic_overview?select=*&billboard_code=eq.${encodeURIComponent(cleanCode)}&stat_date=eq.${selectedDate}&limit=1&_nocache=${Date.now()}`;
+            
+            // Query yesterday row in IST for percentage change calculation
+            const yesterdayDate = getYesterdayIST(selectedDate);
+            const yesterdayQueryUrl = `https://buqtshfptmqieaqcghfx.supabase.co/rest/v1/traffic_overview?select=*&billboard_code=eq.${encodeURIComponent(cleanCode)}&stat_date=eq.${yesterdayDate}&limit=1`;
+
+            const [response, yesterdayResponse] = await Promise.all([
+                fetch(queryUrl, {
+                    cache: 'no-store',
+                    headers: {
+                        'apikey': SUPABASE_SERVICE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                }),
+                fetch(yesterdayQueryUrl, {
+                    cache: 'no-store',
+                    headers: {
+                        'apikey': SUPABASE_SERVICE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                }).catch(() => null)
+            ]);
+
+            let yesterdayRow = null;
+            if (yesterdayResponse && yesterdayResponse.ok) {
+                const yData = await yesterdayResponse.json();
+                if (yData && Array.isArray(yData) && yData.length > 0) {
+                    yesterdayRow = yData[0];
+                }
+            }
 
             if (response.ok) {
                 const data = await response.json();
                 if (data && Array.isArray(data) && data.length > 0 && data[0].billboard_code === cleanCode) {
                     const row = data[0];
-                    updateDashboardWithLiveData(row, cleanCode);
-                    setStatus('connected', true);
+                    updateDashboardWithLiveData(row, cleanCode, yesterdayRow);
+                    
+                    // Offline detection: if last_updated is older than 60s or is_live is false
+                    const lastUpdatedTimeMs = row.last_updated ? new Date(row.last_updated).getTime() : 0;
+                    const diffSeconds = (Date.now() - lastUpdatedTimeMs) / 1000;
+                    const isOffline = (!row.is_live || diffSeconds > 60);
+
+                    if (isOffline) {
+                        const updatedTimeStr = row.last_updated ? new Intl.DateTimeFormat('en-US', {
+                            timeZone: 'Asia/Kolkata',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: true
+                        }).format(new Date(row.last_updated)) : '--:--:--';
+                        setStatus('offline', true, true, updatedTimeStr);
+                    } else {
+                        setStatus('connected', true, false);
+                    }
+
                     if (elements.lastUpdatedTime) {
                         elements.lastUpdatedTime.textContent = formatLastUpdated(new Date());
                     }
                     return row;
                 } else {
-                    // STRICT NO-DATA RULE: Exact billboard has no records in database -> Display 0s
+                    // STRICT NO-DATA RULE: Billboard has no record for this date -> Apply zero state
                     applyZeroState(cleanCode);
+                    setStatus('connected', true, false);
                     if (elements.lastUpdatedTime) {
                         elements.lastUpdatedTime.textContent = formatLastUpdated(new Date());
                     }
@@ -1097,10 +1268,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function applyZeroState(cleanCode) {
         state.stats = getInitialStats();
+        state.stats.peakHour = 'N/A';
         state.spawnChance = 0;
         vehicles = [];
 
         updateUIElements();
+
+        // Reset KPI trend badges to neutral '--'
+        updateKpiBadge('kpi-vehicles-trend', 'kpi-vehicles-trend-wrapper', 'kpi-vehicles-trend-icon', 0, 0);
+        updateKpiBadge('kpi-dwell-trend', 'kpi-dwell-trend-wrapper', 'kpi-dwell-trend-icon', 0, 0);
+        updateKpiBadge('kpi-reach-trend', 'kpi-reach-trend-wrapper', 'kpi-reach-trend-icon', 0, 0);
+        updateKpiBadge('kpi-flow-trend', 'kpi-flow-trend-wrapper', 'kpi-flow-trend-icon', 0, 0);
+        if (window.lucide) lucide.createIcons();
 
         // Refresh Donut Chart to 0
         if (state.charts.donut) {
@@ -1149,7 +1328,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setStatus('connected', true);
     }
 
-    function updateDashboardWithLiveData(data, targetBillboard) {
+    function updateDashboardWithLiveData(data, targetBillboard, yesterdayData = null) {
         if (!data) {
             applyZeroState(targetBillboard || activeBillboardCode);
             return;
@@ -1203,8 +1382,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         updateUIElements();
 
-        // Set status to connected
-        setStatus('connected', true);
+        // Update comparison badges against yesterday
+        updateKpiBadge('kpi-vehicles-trend', 'kpi-vehicles-trend-wrapper', 'kpi-vehicles-trend-icon', totalVehicles, yesterdayData?.total_vehicles);
+        updateKpiBadge('kpi-dwell-trend', 'kpi-dwell-trend-wrapper', 'kpi-dwell-trend-icon', data.avg_exposure_time, yesterdayData?.avg_exposure_time);
+        updateKpiBadge('kpi-reach-trend', 'kpi-reach-trend-wrapper', 'kpi-reach-trend-icon', data.estimated_reach, yesterdayData?.estimated_reach);
+        updateKpiBadge('kpi-flow-trend', 'kpi-flow-trend-wrapper', 'kpi-flow-trend-icon', data.flow_rate, yesterdayData?.flow_rate);
+        if (window.lucide) lucide.createIcons();
 
         // Update timestamp to current fetch time
         if (elements.lastUpdatedTime) {
@@ -1273,12 +1456,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function setStatus(stateName, isDb = false) {
+    function setStatus(stateName, isDb = false, isOffline = false, lastUpdatedStr = '') {
         const indicator = document.getElementById('connectionStatusIndicator');
         const statusText = document.getElementById('connectionStatusText');
         if (!indicator || !statusText) return;
 
-        if (stateName === 'connected') {
+        if (isOffline) {
+            indicator.className = 'status-indicator offline';
+            statusText.textContent = lastUpdatedStr ? `OFFLINE (${lastUpdatedStr})` : 'OFFLINE';
+        } else if (stateName === 'connected') {
             indicator.className = 'status-indicator connected';
             statusText.textContent = isDb ? 'CONNECTED' : 'LIVE';
         } else if (stateName === 'reconnecting') {

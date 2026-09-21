@@ -159,9 +159,10 @@
                             </select>
                         </div>
                         
-                        <div class="selector-box datetime-range-wrapper">
+                        <div class="selector-box datetime-range-wrapper" id="dateRangeSelectorBox" style="cursor: pointer; position: relative;">
                             <i data-lucide="calendar" class="selector-icon"></i>
                             <span class="range-display" id="dateRangeDisplay">Today, Real-time Feed</span>
+                            <input type="date" id="datePickerInput" style="position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; left: 0; bottom: 0;" />
                         </div>
                     </div>
                     
@@ -190,10 +191,10 @@
                         </div>
                     </div>
                     <div class="kpi-value-container">
-                        <span class="kpi-value" id="kpi-vehicles-value">17,820</span>
-                        <span class="kpi-trend trend-up">
-                            <i data-lucide="trending-up"></i>
-                            <span id="kpi-vehicles-trend">+5.2%</span>
+                        <span class="kpi-value" id="kpi-vehicles-value">0</span>
+                        <span class="kpi-trend trend-neutral" id="kpi-vehicles-trend-wrapper">
+                            <i data-lucide="trending-up" id="kpi-vehicles-trend-icon"></i>
+                            <span id="kpi-vehicles-trend">--</span>
                         </span>
                     </div>
                     <div class="kpi-chart-wrapper">
@@ -211,10 +212,10 @@
                         </div>
                     </div>
                     <div class="kpi-value-container">
-                        <span class="kpi-value" id="kpi-dwell-value">14.8 sec</span>
-                        <span class="kpi-trend trend-up" id="kpi-dwell-trend-wrapper">
+                        <span class="kpi-value" id="kpi-dwell-value">0.0 sec</span>
+                        <span class="kpi-trend trend-neutral" id="kpi-dwell-trend-wrapper">
                             <i data-lucide="trending-up" id="kpi-dwell-trend-icon"></i>
-                            <span id="kpi-dwell-trend">+2.4%</span>
+                            <span id="kpi-dwell-trend">--</span>
                         </span>
                     </div>
                     <div class="kpi-chart-wrapper">
@@ -231,11 +232,11 @@
                         </div>
                     </div>
                     <div class="kpi-value-container">
-                        <span class="kpi-value time-value" id="kpi-peak-value">6:00 PM – 7:00 PM</span>
+                        <span class="kpi-value time-value" id="kpi-peak-value">N/A</span>
                     </div>
                     <div class="kpi-footer-note">
                         <span class="note-label">Avg. Density:</span>
-                        <span class="note-value" id="kpi-peak-density">184 veh/min</span>
+                        <span class="note-value" id="kpi-peak-density">-- veh/min</span>
                     </div>
                 </div>
 
@@ -248,10 +249,10 @@
                         </div>
                     </div>
                     <div class="kpi-value-container">
-                        <span class="kpi-value" id="kpi-reach-value">42,500</span>
-                        <span class="kpi-trend trend-up">
-                            <i data-lucide="trending-up"></i>
-                            <span id="kpi-reach-trend">+4.7%</span>
+                        <span class="kpi-value" id="kpi-reach-value">0</span>
+                        <span class="kpi-trend trend-neutral" id="kpi-reach-trend-wrapper">
+                            <i data-lucide="trending-up" id="kpi-reach-trend-icon"></i>
+                            <span id="kpi-reach-trend">--</span>
                         </span>
                     </div>
                     <div class="kpi-chart-wrapper">
@@ -268,10 +269,10 @@
                         </div>
                     </div>
                     <div class="kpi-value-container">
-                        <span class="kpi-value" id="kpi-flow-value">84.5 / min</span>
-                        <span class="kpi-trend trend-down" id="kpi-flow-trend-wrapper">
+                        <span class="kpi-value" id="kpi-flow-value">0.0 / min</span>
+                        <span class="kpi-trend trend-neutral" id="kpi-flow-trend-wrapper">
                             <i data-lucide="trending-down" id="kpi-flow-trend-icon"></i>
-                            <span id="kpi-flow-trend">-1.2%</span>
+                            <span id="kpi-flow-trend">--</span>
                         </span>
                     </div>
                     <div class="kpi-chart-wrapper">

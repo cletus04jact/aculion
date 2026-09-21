@@ -164,12 +164,14 @@ export const billboardService = {
     }
   },
 
-  getTrafficOverview: async (billboardCode: string): Promise<any> => {
+  getTrafficOverview: async (billboardCode: string, statDate?: string): Promise<any> => {
+    const targetDate = statDate || new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
     const { data, error } = await supabase
       .from("traffic_overview")
       .select("*")
       .eq("billboard_code", billboardCode)
-      .order("created_at", { ascending: false })
+      .eq("stat_date", targetDate)
+      .order("last_updated", { ascending: false })
       .limit(1)
       .maybeSingle();
 

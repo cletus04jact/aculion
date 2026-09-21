@@ -159,9 +159,10 @@
                             </select>
                         </div>
                         
-                        <div class="selector-box datetime-range-wrapper">
+                        <div class="selector-box datetime-range-wrapper" id="dateRangeSelectorBox" style="cursor: pointer; position: relative;">
                             <i data-lucide="calendar" class="selector-icon"></i>
                             <span class="range-display" id="dateRangeDisplay">Today, Real-time Feed</span>
+                            <input type="date" id="datePickerInput" style="position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; left: 0; bottom: 0;" />
                         </div>
                     </div>
                     
@@ -191,8 +192,8 @@
                     </div>
                     <div class="kpi-value-container">
                         <span class="kpi-value" id="kpi-vehicles-value">0</span>
-                        <span class="kpi-trend trend-up">
-                            <i data-lucide="trending-up"></i>
+                        <span class="kpi-trend trend-neutral" id="kpi-vehicles-trend-wrapper">
+                            <i data-lucide="trending-up" id="kpi-vehicles-trend-icon"></i>
                             <span id="kpi-vehicles-trend">--</span>
                         </span>
                     </div>
@@ -212,7 +213,7 @@
                     </div>
                     <div class="kpi-value-container">
                         <span class="kpi-value" id="kpi-dwell-value">0.0 sec</span>
-                        <span class="kpi-trend trend-up" id="kpi-dwell-trend-wrapper">
+                        <span class="kpi-trend trend-neutral" id="kpi-dwell-trend-wrapper">
                             <i data-lucide="trending-up" id="kpi-dwell-trend-icon"></i>
                             <span id="kpi-dwell-trend">--</span>
                         </span>
@@ -249,8 +250,8 @@
                     </div>
                     <div class="kpi-value-container">
                         <span class="kpi-value" id="kpi-reach-value">0</span>
-                        <span class="kpi-trend trend-up">
-                            <i data-lucide="trending-up"></i>
+                        <span class="kpi-trend trend-neutral" id="kpi-reach-trend-wrapper">
+                            <i data-lucide="trending-up" id="kpi-reach-trend-icon"></i>
                             <span id="kpi-reach-trend">--</span>
                         </span>
                     </div>
@@ -269,7 +270,7 @@
                     </div>
                     <div class="kpi-value-container">
                         <span class="kpi-value" id="kpi-flow-value">0.0 / min</span>
-                        <span class="kpi-trend trend-down" id="kpi-flow-trend-wrapper">
+                        <span class="kpi-trend trend-neutral" id="kpi-flow-trend-wrapper">
                             <i data-lucide="trending-down" id="kpi-flow-trend-icon"></i>
                             <span id="kpi-flow-trend">--</span>
                         </span>
@@ -311,7 +312,7 @@
                             </div>
                             <div class="dwell-summary-pill">
                                 <span class="pill-label">Median:</span>
-                                <span class="pill-value" id="dwell-stat-median">0.0s</span>
+                                <span class="pill-value" id="dwell-stat-median">12.4s</span>
                             </div>
                         </div>
 
@@ -319,19 +320,19 @@
                         <div class="dwell-stats-grid">
                             <div class="dwell-stat-box">
                                 <span class="dwell-stat-label">Average Dwell Time</span>
-                                <span class="dwell-stat-value text-blue" id="dwell-stat-avg">0.0s</span>
+                                <span class="dwell-stat-value text-blue" id="dwell-stat-avg">14.8s</span>
                             </div>
                             <div class="dwell-stat-box">
                                 <span class="dwell-stat-label">Maximum Dwell Time</span>
-                                <span class="dwell-stat-value text-cyan" id="dwell-stat-max">0.0s</span>
+                                <span class="dwell-stat-value text-cyan" id="dwell-stat-max">58.2s</span>
                             </div>
                             <div class="dwell-stat-box">
                                 <span class="dwell-stat-label">Minimum Dwell Time</span>
-                                <span class="dwell-stat-value text-muted" id="dwell-stat-min">0.0s</span>
+                                <span class="dwell-stat-value text-muted" id="dwell-stat-min">1.5s</span>
                             </div>
                             <div class="dwell-stat-box">
                                 <span class="dwell-stat-label">Median Dwell Time</span>
-                                <span class="dwell-stat-value" id="dwell-stat-median-box">0.0s</span>
+                                <span class="dwell-stat-value" id="dwell-stat-median-box">12.4s</span>
                             </div>
                         </div>
 
@@ -345,22 +346,22 @@
                             <div class="period-item">
                                 <span class="period-name">Morning</span>
                                 <span class="period-sub">06:00 - 12:00</span>
-                                <span class="period-value" id="dwell-period-morning">0.0s</span>
+                                <span class="period-value" id="dwell-period-morning">15.2s</span>
                             </div>
                             <div class="period-item">
                                 <span class="period-name">Afternoon</span>
                                 <span class="period-sub">12:00 - 18:00</span>
-                                <span class="period-value" id="dwell-period-afternoon">0.0s</span>
+                                <span class="period-value" id="dwell-period-afternoon">11.6s</span>
                             </div>
                             <div class="period-item">
                                 <span class="period-name">Evening</span>
                                 <span class="period-sub">18:00 - 24:00</span>
-                                <span class="period-value highlight-cyan" id="dwell-period-evening">0.0s</span>
+                                <span class="period-value highlight-cyan" id="dwell-period-evening">17.4s</span>
                             </div>
                             <div class="period-item">
                                 <span class="period-name">Night</span>
                                 <span class="period-sub">00:00 - 06:00</span>
-                                <span class="period-value" id="dwell-period-night">0.0s</span>
+                                <span class="period-value" id="dwell-period-night">9.8s</span>
                             </div>
                         </div>
                     </div>
@@ -400,12 +401,12 @@
                                         <span class="class-label">Bike</span>
                                     </div>
                                     <div class="class-stats">
-                                        <span class="class-count" id="count-economy">0</span>
-                                        <span class="class-pct" id="pct-economy">0%</span>
+                                        <span class="class-count" id="count-economy">4,760</span>
+                                        <span class="class-pct" id="pct-economy">29%</span>
                                     </div>
                                 </div>
                                 <div class="progress-bar-container">
-                                    <div class="progress-bar-fill economy-bg" id="bar-economy" style="width: 0%;"></div>
+                                    <div class="progress-bar-fill economy-bg" id="bar-economy" style="width: 29%;"></div>
                                 </div>
                             </div>
 
@@ -417,12 +418,12 @@
                                         <span class="class-label">Commercial</span>
                                     </div>
                                     <div class="class-stats">
-                                        <span class="class-count" id="count-premium">0</span>
-                                        <span class="class-pct" id="pct-premium">0%</span>
+                                        <span class="class-count" id="count-premium">1,980</span>
+                                        <span class="class-pct" id="pct-premium">12%</span>
                                     </div>
                                 </div>
                                 <div class="progress-bar-container">
-                                    <div class="progress-bar-fill premium-bg" id="bar-premium" style="width: 0%;"></div>
+                                    <div class="progress-bar-fill premium-bg" id="bar-premium" style="width: 12%;"></div>
                                 </div>
                             </div>
 
@@ -434,12 +435,12 @@
                                         <span class="class-label">Economy</span>
                                     </div>
                                     <div class="class-stats">
-                                        <span class="class-count" id="count-luxury">0</span>
-                                        <span class="class-pct" id="pct-luxury">0%</span>
+                                        <span class="class-count" id="count-luxury">8,420</span>
+                                        <span class="class-pct" id="pct-luxury">52%</span>
                                     </div>
                                 </div>
                                 <div class="progress-bar-container">
-                                    <div class="progress-bar-fill luxury-bg" id="bar-luxury" style="width: 0%;"></div>
+                                    <div class="progress-bar-fill luxury-bg" id="bar-luxury" style="width: 52%;"></div>
                                 </div>
                             </div>
 
@@ -451,12 +452,12 @@
                                         <span class="class-label">Premium</span>
                                     </div>
                                     <div class="class-stats">
-                                        <span class="class-count" id="count-ultra">0</span>
-                                        <span class="class-pct" id="pct-ultra">0%</span>
+                                        <span class="class-count" id="count-ultra">2,130</span>
+                                        <span class="class-pct" id="pct-ultra">13%</span>
                                     </div>
                                 </div>
                                 <div class="progress-bar-container">
-                                    <div class="progress-bar-fill ultra-bg" id="bar-ultra" style="width: 0%;"></div>
+                                    <div class="progress-bar-fill ultra-bg" id="bar-ultra" style="width: 13%;"></div>
                                 </div>
                             </div>
 
@@ -468,12 +469,12 @@
                                         <span class="class-label">Luxury</span>
                                     </div>
                                     <div class="class-stats">
-                                        <span class="class-count" id="count-bikes">0</span>
-                                        <span class="class-pct" id="pct-bikes">0%</span>
+                                        <span class="class-count" id="count-bikes">850</span>
+                                        <span class="class-pct" id="pct-bikes">5%</span>
                                     </div>
                                 </div>
                                 <div class="progress-bar-container">
-                                    <div class="progress-bar-fill bikes-bg" id="bar-bikes" style="width: 0%;"></div>
+                                    <div class="progress-bar-fill bikes-bg" id="bar-bikes" style="width: 5%;"></div>
                                 </div>
                             </div>
 
@@ -485,12 +486,12 @@
                                         <span class="class-label">Ultra Luxury</span>
                                     </div>
                                     <div class="class-stats">
-                                        <span class="class-count" id="count-commercial">0</span>
-                                        <span class="class-pct" id="pct-commercial">0%</span>
+                                        <span class="class-count" id="count-commercial">210</span>
+                                        <span class="class-pct" id="pct-commercial">1%</span>
                                     </div>
                                 </div>
                                 <div class="progress-bar-container">
-                                    <div class="progress-bar-fill commercial-bg" id="bar-commercial" style="width: 0%;"></div>
+                                    <div class="progress-bar-fill commercial-bg" id="bar-commercial" style="width: 1%;"></div>
                                 </div>
                             </div>
                         </div>
