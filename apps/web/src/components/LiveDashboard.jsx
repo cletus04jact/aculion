@@ -207,7 +207,7 @@ export default function LiveDashboard({
   const [livePeople, setLivePeople] = useState(0);
   const [liveVehicles, setLiveVehicles] = useState(0);
   const [liveDwell, setLiveDwell] = useState(0);
-  const [isTrafficLoading, setIsTrafficLoading] = useState(true);
+  const [isTrafficLoading, setIsTrafficLoading] = useState(false);
 
   // CCTV dynamic AI bounding boxes
   const [boxes, setBoxes] = useState([
@@ -365,7 +365,8 @@ export default function LiveDashboard({
     setLiveVehicles(0);
     setLiveDwell(0);
 
-    fetchDbTrafficOverview(false);
+    // Fetch initial traffic data silently without full-screen flash
+    fetchDbTrafficOverview(true);
 
     // Reliable 5-second automatic refresh interval
     const intervalId = setInterval(() => {
@@ -481,7 +482,7 @@ export default function LiveDashboard({
         if (e.data.type === 'ACULION_GENERATE_REPORT_PDF') {
           handleGenerateReport();
         } else if (e.data.type === 'ACULION_REFRESH_TRAFFIC_DATA' || e.data.type === 'REQUEST_TRAFFIC_REFRESH') {
-          fetchDbTrafficOverview(false);
+          fetchDbTrafficOverview(true);
         }
       }
     };

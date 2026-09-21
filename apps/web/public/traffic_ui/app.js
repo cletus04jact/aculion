@@ -367,26 +367,40 @@ document.addEventListener('DOMContentLoaded', () => {
         return `Last updated at ${timeStr}`;
     }
 
+    function setSafeText(el, text) {
+        if (el && el.textContent !== text) {
+            el.textContent = text;
+        }
+    }
+
+    function setSafeWidth(el, width) {
+        if (el && el.style.width !== width) {
+            el.style.width = width;
+        }
+    }
+
     // Refresh trigger handler (used both for auto-refresh interval and manual click)
-    async function triggerAutoRefresh() {
-        try {
-            if (window.parent && window.parent !== window) {
-                window.parent.postMessage({ 
-                    type: 'ACULION_REFRESH_TRAFFIC_DATA',
-                    billboard_code: activeBillboardCode 
-                }, '*');
+    async function triggerAutoRefresh(isManual = false) {
+        if (isManual) {
+            try {
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({ 
+                        type: 'ACULION_REFRESH_TRAFFIC_DATA',
+                        billboard_code: activeBillboardCode 
+                    }, '*');
+                }
+            } catch (e) {
+                console.error("Error dispatching refresh request to parent:", e);
             }
-        } catch (e) {
-            console.error("Error dispatching refresh request to parent:", e);
         }
 
-        await fetchFromSupabaseDirectly(activeBillboardCode);
+        await fetchFromSupabaseDirectly(activeBillboardCode, isManual);
     }
 
     if (elements.refreshBtn) {
         elements.refreshBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            triggerAutoRefresh();
+            triggerAutoRefresh(true);
         });
     }
 
@@ -415,53 +429,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- UI Values Update Binders ---
     function updateUIElements() {
-        // Format KPI numbers
-        if (elements.kpiVehicles) elements.kpiVehicles.textContent = formatIndianNumber(state.stats.totalVehicles);
-        if (elements.kpiDwell) elements.kpiDwell.textContent = `${Number(state.stats.avgDwellTime || 0).toFixed(2)} sec`;
-        if (elements.kpiReach) elements.kpiReach.textContent = formatIndianNumber(state.stats.estimatedReach);
-        if (elements.kpiFlow) elements.kpiFlow.textContent = `${Number(state.stats.flowRate || 0).toFixed(1)} / min`;
-        if (elements.kpiPeak) elements.kpiPeak.textContent = state.stats.peakHour || 'N/A';
+        // Format KPI numbers safely without reflow
+        setSafeText(elements.kpiVehicles, formatIndianNumber(state.stats.totalVehicles));
+        setSafeText(elements.kpiDwell, `${Number(state.stats.avgDwellTime || 0).toFixed(2)} sec`);
+        setSafeText(elements.kpiReach, formatIndianNumber(state.stats.estimatedReach));
+        setSafeText(elements.kpiFlow, `${Number(state.stats.flowRate || 0).toFixed(1)} / min`);
+        setSafeText(elements.kpiPeak, state.stats.peakHour || 'N/A');
 
         // Update list values and progress bars
         Object.keys(state.stats.classes).forEach(key => {
             const data = state.stats.classes[key];
             if (elements.counts && elements.counts[key]) {
-                elements.counts[key].textContent = formatIndianNumber(data.count);
+                setSafeText(elements.counts[key], formatIndianNumber(data.count));
             }
             if (elements.pcts && elements.pcts[key]) {
-                elements.pcts[key].textContent = `${data.pct}%`;
+                setSafeText(elements.pcts[key], `${data.pct}%`);
             }
             if (elements.bars && elements.bars[key]) {
-                elements.bars[key].style.width = `${data.pct}%`;
+                setSafeWidth(elements.bars[key], `${data.pct}%`);
             }
         });
 
         // Dwell details
-        if (elements.dwellAvg) elements.dwellAvg.textContent = `${Number(state.stats.dwellStats.avg || 0).toFixed(1)}s`;
-        if (elements.dwellMax) elements.dwellMax.textContent = `${Number(state.stats.dwellStats.max || 0).toFixed(1)}s`;
-        if (elements.dwellMin) elements.dwellMin.textContent = `${Number(state.stats.dwellStats.min || 0).toFixed(1)}s`;
-        if (elements.dwellMedian) elements.dwellMedian.textContent = `${Number(state.stats.dwellStats.median || 0).toFixed(1)}s`;
-        if (elements.dwellMedianBox) elements.dwellMedianBox.textContent = `${Number(state.stats.dwellStats.median || 0).toFixed(1)}s`;
+        setSafeText(elements.dwellAvg, `${Number(state.stats.dwellStats.avg || 0).toFixed(1)}s`);
+        setSafeText(elements.dwellMax, `${Number(state.stats.dwellStats.max || 0).toFixed(1)}s`);
+        setSafeText(elements.dwellMin, `${Number(state.stats.dwellStats.min || 0).toFixed(1)}s`);
+        setSafeText(elements.dwellMedian, `${Number(state.stats.dwellStats.median || 0).toFixed(1)}s`);
+        setSafeText(elements.dwellMedianBox, `${Number(state.stats.dwellStats.median || 0).toFixed(1)}s`);
 
         // Dwell periods
-        if (elements.dwellMorning) elements.dwellMorning.textContent = `${Number(state.stats.dwellStats.periods.morning || 0).toFixed(1)}s`;
-        if (elements.dwellAfternoon) elements.dwellAfternoon.textContent = `${Number(state.stats.dwellStats.periods.afternoon || 0).toFixed(1)}s`;
-        if (elements.dwellEvening) elements.dwellEvening.textContent = `${Number(state.stats.dwellStats.periods.evening || 0).toFixed(1)}s`;
-        if (elements.dwellNight) elements.dwellNight.textContent = `${Number(state.stats.dwellStats.periods.night || 0).toFixed(1)}s`;
+        setSafeText(elements.dwellMorning, `${Number(state.stats.dwellStats.periods.morning || 0).toFixed(1)}s`);
+        setSafeText(elements.dwellAfternoon, `${Number(state.stats.dwellStats.periods.afternoon || 0).toFixed(1)}s`);
+        setSafeText(elements.dwellEvening, `${Number(state.stats.dwellStats.periods.evening || 0).toFixed(1)}s`);
+        setSafeText(elements.dwellNight, `${Number(state.stats.dwellStats.periods.night || 0).toFixed(1)}s`);
 
-        // Update timestamp
-        if (elements.hudTime) {
-            const now = new Date();
-            elements.hudTime.textContent = now.toISOString().replace('T', ' ').substring(0, 19);
-        }
-
+        // Update HUD stats
         if (elements.hudStats) {
-            elements.hudStats.textContent = `DETECTIONS: ${formatIndianNumber(state.stats.totalVehicles)}`;
+            setSafeText(elements.hudStats, `DETECTIONS: ${formatIndianNumber(state.stats.totalVehicles)}`);
         }
 
         updateAIRecommendations();
     }
 
+    let lastRecKey = '';
     function updateAIRecommendations() {
         const recTraffic = document.getElementById('recTrafficText');
         const recVehicleMix = document.getElementById('recVehicleMixText');
@@ -473,13 +483,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const peak = state.stats.peakHour;
         const dwellAvg = Number(state.stats.avgDwellTime || 0).toFixed(1);
+        const totalV = state.stats.totalVehicles;
 
-        if (state.stats.totalVehicles === 0) {
+        if (totalV === 0) {
+            const currentRecKey = `zero_${activeBillboardCode}`;
+            if (lastRecKey === currentRecKey) return;
+            lastRecKey = currentRecKey;
             recTraffic.innerHTML = `No live vehicular flow detected on <strong>${activeBillboardCode}</strong>. Connect camera sensor to begin tracking.`;
-            recVehicleMix.textContent = `Vehicle mix breakdown will update automatically once traffic data streams from the Radxa computer.`;
-            recDwell.textContent = `Average dwell time analytics are currently idle (0.0s).`;
-            recAudience.textContent = `Audience reach analysis will calculate when vehicle detection thresholds are active.`;
-            recSmartAction.textContent = `Standby for active traffic data streams to generate AI-assisted campaign optimizations.`;
+            setSafeText(recVehicleMix, `Vehicle mix breakdown will update automatically once traffic data streams from the Radxa computer.`);
+            setSafeText(recDwell, `Average dwell time analytics are currently idle (0.0s).`);
+            setSafeText(recAudience, `Audience reach analysis will calculate when vehicle detection thresholds are active.`);
+            setSafeText(recSmartAction, `Standby for active traffic data streams to generate AI-assisted campaign optimizations.`);
             return;
         }
 
@@ -492,11 +506,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        const currentRecKey = `${totalV}_${peak}_${dwellAvg}_${topClass}`;
+        if (lastRecKey === currentRecKey) return;
+        lastRecKey = currentRecKey;
+
         recTraffic.innerHTML = `Peak traffic detected between <strong>${peak}</strong>. Recommend prioritizing advertising campaigns during this high-traffic window.`;
-        recVehicleMix.textContent = `${topClass} account for the highest traffic volume. Truck and Bus traffic increases during morning hours. Cars and SUVs peak during evening hours.`;
-        recDwell.textContent = `Average dwell time (${dwellAvg}s) is above the expected benchmark. Current billboard visibility is performing well with strong advertisement engagement.`;
-        recAudience.textContent = `High-value vehicle segments (Cars + SUVs) represent an ideal audience for premium brands. Recommend targeting consumer campaigns during peak evening traffic.`;
-        recSmartAction.textContent = `Increase brand campaigns from 6 PM to 8 PM to maximize visibility and audience engagement based on current traffic patterns and dwell time analytics (${dwellAvg}s).`;
+        setSafeText(recVehicleMix, `${topClass} account for the highest traffic volume. Truck and Bus traffic increases during morning hours. Cars and SUVs peak during evening hours.`);
+        setSafeText(recDwell, `Average dwell time (${dwellAvg}s) is above the expected benchmark. Current billboard visibility is performing well with strong advertisement engagement.`);
+        setSafeText(recAudience, `High-value vehicle segments (Cars + SUVs) represent an ideal audience for premium brands. Recommend targeting consumer campaigns during peak evening traffic.`);
+        setSafeText(recSmartAction, `Increase brand campaigns from 6 PM to 8 PM to maximize visibility and audience engagement based on current traffic patterns and dwell time analytics (${dwellAvg}s).`);
     }
 
     // --- Heat Timeline Generation ---
@@ -1065,68 +1083,22 @@ document.addEventListener('DOMContentLoaded', () => {
         requestAnimationFrame(drawCctvFrame);
     }
 
-    // --- Dynamic Trend Line Streaming ---
-    // Every 5 seconds, append live point if live data exists
-    setInterval(() => {
-        if (!state.charts.trendLine) return;
-        if (state.stats.totalVehicles === 0) return; // Strict: no fake data when vehicle count is 0
-
-        const now = new Date();
-        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-        const classes = state.stats.classes;
-        const trend = state.charts.trendLine;
-
-        const seriesData = trend.w.config.series;
-        const newCats = [...trend.w.config.xaxis.categories];
-
-        newCats.push(timeStr);
-        if (newCats.length > 10) newCats.shift();
-
-        const counts = [
-            Math.round(classes.economy.count / 40 + (Math.random() - 0.5) * 5),
-            Math.round(classes.premium.count / 40 + (Math.random() - 0.5) * 3),
-            Math.round(classes.luxury.count / 40 + (Math.random() - 0.5) * 2),
-            Math.round(classes.ultra.count / 40 + (Math.random() - 0.5) * 1),
-            Math.round(classes.bikes.count / 40 + (Math.random() - 0.5) * 3),
-            Math.round(classes.commercial.count / 40 + (Math.random() - 0.5) * 2)
-        ];
-
-        const normalizedCounts = counts.map(val => Math.max(0, val));
-
-        const updatedSeries = seriesData.map((series, idx) => {
-            const data = [...series.data];
-            data.push(normalizedCounts[idx]);
-            if (data.length > 10) data.shift();
-            return {
-                name: series.name,
-                data: data
-            };
-        });
-
-        trend.updateOptions({
-            xaxis: { categories: newCats },
-            series: updatedSeries
-        });
-    }, 5000);
-
     // --- Direct Supabase REST Integration ---
     const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ1cXRzaGZwdG1xaWVhcWNnaGZ4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MzkwOTYyMiwiZXhwIjoyMDk5NDg1NjIyfQ.f12uC9oK_BzLzlXgy_5ybUAgdHJTY6N7E5VWXXmgr5Q';
     let isFetchingDirectly = false;
 
-    // Helper to calculate and update KPI percentage change badges
+    // Helper to calculate and update KPI percentage change badges safely
     function updateKpiBadge(trendElId, wrapperElId, iconElId, currentVal, prevVal) {
         const trendEl = document.getElementById(trendElId);
         const wrapperEl = wrapperElId ? document.getElementById(wrapperElId) : trendEl?.parentElement;
-        const iconEl = iconElId ? document.getElementById(iconElId) : wrapperEl?.querySelector('i, svg');
         if (!trendEl) return;
 
         const c = Number(currentVal);
         const p = Number(prevVal);
 
         if (isNaN(p) || p === 0 || isNaN(c) || c === 0) {
-            trendEl.textContent = '--';
-            if (wrapperEl) {
+            setSafeText(trendEl, '--');
+            if (wrapperEl && wrapperEl.className !== 'kpi-trend trend-neutral') {
                 wrapperEl.className = 'kpi-trend trend-neutral';
             }
             return;
@@ -1134,35 +1106,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const diff = c - p;
         const pct = Math.abs((diff / p) * 100).toFixed(1);
+        const textVal = diff >= 0 ? `+${pct}%` : `-${pct}%`;
+        const clsVal = diff >= 0 ? 'kpi-trend trend-up' : 'kpi-trend trend-down';
 
-        if (diff >= 0) {
-            trendEl.textContent = `+${pct}%`;
-            if (wrapperEl) {
-                wrapperEl.className = 'kpi-trend trend-up';
-            }
-            if (iconEl) {
-                iconEl.setAttribute('data-lucide', 'trending-up');
-            }
-        } else {
-            trendEl.textContent = `-${pct}%`;
-            if (wrapperEl) {
-                wrapperEl.className = 'kpi-trend trend-down';
-            }
-            if (iconEl) {
-                iconEl.setAttribute('data-lucide', 'trending-down');
-            }
+        setSafeText(trendEl, textVal);
+        if (wrapperEl && wrapperEl.className !== clsVal) {
+            wrapperEl.className = clsVal;
         }
     }
 
-    async function fetchFromSupabaseDirectly(overrideCode) {
+    async function fetchFromSupabaseDirectly(overrideCode, isManual = false) {
         if (isFetchingDirectly) return null;
         isFetchingDirectly = true;
 
         const targetCode = overrideCode || activeBillboardCode || 'ACU-BB-0001';
         const cleanCode = (targetCode === 'active-cam') ? (urlParams.get('billboard_code') || 'ACU-BB-0001') : targetCode;
 
-        // Show spinning animation on the refresh icon while the request is running
-        const icon = elements.refreshBtn ? elements.refreshBtn.querySelector('svg, .refresh-icon, i, [data-lucide]') : null;
+        // Show spinning animation ONLY when user manually clicks refresh
+        const icon = (isManual && elements.refreshBtn) ? elements.refreshBtn.querySelector('svg, .refresh-icon, i, [data-lucide]') : null;
         if (icon) {
             icon.classList.add('spin-animation');
         }
@@ -1174,7 +1135,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentTrackedDay = checkToday;
                 selectedDate = checkToday;
                 if (dateRangeDisplay) {
-                    dateRangeDisplay.textContent = 'Today, Real-time Feed';
+                    setSafeText(dateRangeDisplay, 'Today, Real-time Feed');
                 }
             }
 
@@ -1237,7 +1198,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     if (elements.lastUpdatedTime) {
-                        elements.lastUpdatedTime.textContent = formatLastUpdated(new Date());
+                        setSafeText(elements.lastUpdatedTime, formatLastUpdated(new Date()));
                     }
                     return row;
                 } else {
@@ -1245,14 +1206,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     applyZeroState(cleanCode);
                     setStatus('connected', true, false);
                     if (elements.lastUpdatedTime) {
-                        elements.lastUpdatedTime.textContent = formatLastUpdated(new Date());
+                        setSafeText(elements.lastUpdatedTime, formatLastUpdated(new Date()));
                     }
                     return null;
                 }
             } else {
                 console.warn("Supabase fetch returned error status:", response.status);
                 if (elements.lastUpdatedTime) {
-                    elements.lastUpdatedTime.textContent = formatLastUpdated(new Date());
+                    setSafeText(elements.lastUpdatedTime, formatLastUpdated(new Date()));
                 }
             }
         } catch (err) {
@@ -1279,26 +1240,10 @@ document.addEventListener('DOMContentLoaded', () => {
         updateKpiBadge('kpi-dwell-trend', 'kpi-dwell-trend-wrapper', 'kpi-dwell-trend-icon', 0, 0);
         updateKpiBadge('kpi-reach-trend', 'kpi-reach-trend-wrapper', 'kpi-reach-trend-icon', 0, 0);
         updateKpiBadge('kpi-flow-trend', 'kpi-flow-trend-wrapper', 'kpi-flow-trend-icon', 0, 0);
-        if (window.lucide) lucide.createIcons();
 
         // Refresh Donut Chart to 0
         if (state.charts.donut) {
-            state.charts.donut.updateSeries([0, 0, 0, 0, 0, 0]);
-            state.charts.donut.updateOptions({
-                plotOptions: {
-                    pie: {
-                        donut: {
-                            labels: {
-                                total: {
-                                    formatter: function () {
-                                        return "0";
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            });
+            state.charts.donut.updateSeries([0, 0, 0, 0, 0, 0], false);
         }
 
         // Refresh Traffic Trend Chart to 0
@@ -1308,25 +1253,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 name: series.name,
                 data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
             }));
-            state.charts.trendLine.updateSeries(updatedSeries);
+            state.charts.trendLine.updateSeries(updatedSeries, false);
         }
 
         // Sparklines to 0
         if (state.charts.sparkVehicles) {
-            state.charts.sparkVehicles.updateSeries([{ data: [0, 0, 0, 0, 0, 0, 0, 0, 0] }]);
+            state.charts.sparkVehicles.updateSeries([{ data: [0, 0, 0, 0, 0, 0, 0, 0, 0] }], false);
         }
         if (state.charts.sparkDwell) {
-            state.charts.sparkDwell.updateSeries([{ data: [0, 0, 0, 0, 0, 0, 0, 0, 0] }]);
+            state.charts.sparkDwell.updateSeries([{ data: [0, 0, 0, 0, 0, 0, 0, 0, 0] }], false);
         }
         if (state.charts.sparkReach) {
-            state.charts.sparkReach.updateSeries([{ data: [0, 0, 0, 0, 0, 0, 0, 0, 0] }]);
+            state.charts.sparkReach.updateSeries([{ data: [0, 0, 0, 0, 0, 0, 0, 0, 0] }], false);
         }
         if (state.charts.sparkFlow) {
-            state.charts.sparkFlow.updateSeries([{ data: [0, 0, 0, 0, 0, 0, 0, 0, 0] }]);
+            state.charts.sparkFlow.updateSeries([{ data: [0, 0, 0, 0, 0, 0, 0, 0, 0] }], false);
         }
 
         setStatus('connected', true);
     }
+
+    let lastDonutSeriesStr = '';
+    let lastTrendSeriesStr = '';
 
     function updateDashboardWithLiveData(data, targetBillboard, yesterdayData = null) {
         if (!data) {
@@ -1382,59 +1330,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
         updateUIElements();
 
-        // Update comparison badges against yesterday
+        // Update comparison badges against yesterday safely
         updateKpiBadge('kpi-vehicles-trend', 'kpi-vehicles-trend-wrapper', 'kpi-vehicles-trend-icon', totalVehicles, yesterdayData?.total_vehicles);
         updateKpiBadge('kpi-dwell-trend', 'kpi-dwell-trend-wrapper', 'kpi-dwell-trend-icon', data.avg_exposure_time, yesterdayData?.avg_exposure_time);
         updateKpiBadge('kpi-reach-trend', 'kpi-reach-trend-wrapper', 'kpi-reach-trend-icon', data.estimated_reach, yesterdayData?.estimated_reach);
         updateKpiBadge('kpi-flow-trend', 'kpi-flow-trend-wrapper', 'kpi-flow-trend-icon', data.flow_rate, yesterdayData?.flow_rate);
-        if (window.lucide) lucide.createIcons();
 
-        // Update timestamp to current fetch time
+        // Update timestamp safely
         if (elements.lastUpdatedTime) {
-            elements.lastUpdatedTime.textContent = formatLastUpdated(new Date());
+            setSafeText(elements.lastUpdatedTime, formatLastUpdated(new Date()));
         }
 
         if (elements.hudTime) {
             const updatedDate = data.last_updated ? new Date(data.last_updated) : new Date();
-            elements.hudTime.textContent = updatedDate.toISOString().replace('T', ' ').substring(0, 19);
+            setSafeText(elements.hudTime, updatedDate.toISOString().replace('T', ' ').substring(0, 19));
         }
 
-        // Refresh Donut Chart and synchronize center label with KPI
+        // Refresh Donut Chart smoothly only if values changed
         if (state.charts.donut) {
-            state.charts.donut.updateSeries([
+            const newDonut = [
                 state.stats.classes.economy.count,
                 state.stats.classes.premium.count,
                 state.stats.classes.luxury.count,
                 state.stats.classes.ultra.count,
                 state.stats.classes.bikes.count,
                 state.stats.classes.commercial.count
-            ]);
-            state.charts.donut.updateOptions({
-                plotOptions: {
-                    pie: {
-                        donut: {
-                            labels: {
-                                total: {
-                                    formatter: function () {
-                                        return formatIndianNumber(state.stats.totalVehicles);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            });
+            ];
+            const newDonutStr = newDonut.join(',');
+            if (newDonutStr !== lastDonutSeriesStr) {
+                lastDonutSeriesStr = newDonutStr;
+                state.charts.donut.updateSeries(newDonut, false);
+            }
         }
 
-        // Refresh Traffic Trend Chart series scaled to 15-min intervals
+        // Refresh Traffic Trend Chart series scaled to 15-min intervals smoothly without redraw
         if (state.charts.trendLine) {
             if (totalVehicles === 0) {
-                const seriesData = state.charts.trendLine.w.config.series;
-                const updatedSeries = seriesData.map(series => ({
-                    name: series.name,
-                    data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-                }));
-                state.charts.trendLine.updateSeries(updatedSeries);
+                if (lastTrendSeriesStr !== 'zero') {
+                    lastTrendSeriesStr = 'zero';
+                    const seriesData = state.charts.trendLine.w.config.series;
+                    const updatedSeries = seriesData.map(series => ({
+                        name: series.name,
+                        data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                    }));
+                    state.charts.trendLine.updateSeries(updatedSeries, false);
+                }
             } else {
                 const bBase = Math.max(1, Math.round(state.stats.classes.economy.count / 45));
                 const cBase = Math.max(1, Math.round(state.stats.classes.premium.count / 45));
@@ -1443,15 +1383,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 const lBase = Math.max(1, Math.round(state.stats.classes.bikes.count / 45));
                 const uBase = Math.max(1, Math.round(state.stats.classes.commercial.count / 45));
 
-                const updatedSeries = [
-                    { name: 'Bike', data: [bBase*0.6, bBase*0.8, bBase*0.75, bBase*0.9, bBase*1.1, bBase*0.95, bBase*1.2, bBase*1.4, bBase*1.3, bBase].map(Math.round) },
-                    { name: 'Commercial', data: [cBase*0.7, cBase*0.9, cBase*1.0, cBase*0.95, cBase*0.8, cBase*0.75, cBase*0.9, cBase*1.1, cBase*1.0, cBase].map(Math.round) },
-                    { name: 'Economy', data: [eBase*0.6, eBase*0.75, eBase*0.7, eBase*0.85, eBase*0.95, eBase*0.8, eBase*1.05, eBase*1.2, eBase*1.1, eBase].map(Math.round) },
-                    { name: 'Premium', data: [pBase*0.5, pBase*0.6, pBase*0.7, pBase*0.65, pBase*0.85, pBase*0.8, pBase*0.95, pBase*1.15, pBase*1.0, pBase].map(Math.round) },
-                    { name: 'Luxury', data: [lBase*0.5, lBase*0.6, lBase*0.6, lBase*0.75, lBase*0.7, lBase*0.6, lBase*0.9, lBase*1.2, lBase*0.9, lBase].map(Math.round) },
-                    { name: 'Ultra Luxury', data: [uBase*0.4, uBase*0.5, uBase*0.6, uBase*0.5, uBase*0.7, uBase*0.4, uBase*1.0, uBase*1.2, uBase*0.8, uBase].map(Math.round) }
-                ];
-                state.charts.trendLine.updateSeries(updatedSeries);
+                const currentTrendKey = `${bBase}_${cBase}_${eBase}_${pBase}_${lBase}_${uBase}`;
+                if (currentTrendKey !== lastTrendSeriesStr) {
+                    lastTrendSeriesStr = currentTrendKey;
+                    const updatedSeries = [
+                        { name: 'Bike', data: [bBase*0.6, bBase*0.8, bBase*0.75, bBase*0.9, bBase*1.1, bBase*0.95, bBase*1.2, bBase*1.4, bBase*1.3, bBase].map(Math.round) },
+                        { name: 'Commercial', data: [cBase*0.7, cBase*0.9, cBase*1.0, cBase*0.95, cBase*0.8, cBase*0.75, cBase*0.9, cBase*1.1, cBase*1.0, cBase].map(Math.round) },
+                        { name: 'Economy', data: [eBase*0.6, eBase*0.75, eBase*0.7, eBase*0.85, eBase*0.95, eBase*0.8, eBase*1.05, eBase*1.2, eBase*1.1, eBase].map(Math.round) },
+                        { name: 'Premium', data: [pBase*0.5, pBase*0.6, pBase*0.7, pBase*0.65, pBase*0.85, pBase*0.8, pBase*0.95, pBase*1.15, pBase*1.0, pBase].map(Math.round) },
+                        { name: 'Luxury', data: [lBase*0.5, lBase*0.6, lBase*0.6, lBase*0.75, lBase*0.7, lBase*0.6, lBase*0.9, lBase*1.2, lBase*0.9, lBase].map(Math.round) },
+                        { name: 'Ultra Luxury', data: [uBase*0.4, uBase*0.5, uBase*0.6, uBase*0.5, uBase*0.7, uBase*0.4, uBase*1.0, uBase*1.2, uBase*0.8, uBase].map(Math.round) }
+                    ];
+                    state.charts.trendLine.updateSeries(updatedSeries, false);
+                }
             }
         }
     }
@@ -1462,26 +1406,26 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!indicator || !statusText) return;
 
         if (isOffline) {
-            indicator.className = 'status-indicator offline';
-            statusText.textContent = lastUpdatedStr ? `OFFLINE (${lastUpdatedStr})` : 'OFFLINE';
+            if (indicator.className !== 'status-indicator offline') indicator.className = 'status-indicator offline';
+            setSafeText(statusText, lastUpdatedStr ? `OFFLINE (${lastUpdatedStr})` : 'OFFLINE');
         } else if (stateName === 'connected') {
-            indicator.className = 'status-indicator connected';
-            statusText.textContent = isDb ? 'CONNECTED' : 'LIVE';
+            if (indicator.className !== 'status-indicator connected') indicator.className = 'status-indicator connected';
+            setSafeText(statusText, isDb ? 'CONNECTED' : 'LIVE');
         } else if (stateName === 'reconnecting') {
-            indicator.className = 'status-indicator reconnecting';
-            statusText.textContent = 'CONNECTING...';
+            if (indicator.className !== 'status-indicator reconnecting') indicator.className = 'status-indicator reconnecting';
+            setSafeText(statusText, 'CONNECTING...');
         } else {
-            indicator.className = 'status-indicator disconnected';
-            statusText.textContent = 'DISCONNECTED';
+            if (indicator.className !== 'status-indicator disconnected') indicator.className = 'status-indicator disconnected';
+            setSafeText(statusText, 'DISCONNECTED');
         }
     }
 
-    // Reliable 5-second automatic refresh interval
+    // Reliable 5-second automatic refresh interval (silent background fetch)
     if (window.__trafficAutoRefreshInterval) {
         clearInterval(window.__trafficAutoRefreshInterval);
     }
     window.__trafficAutoRefreshInterval = setInterval(() => {
-        triggerAutoRefresh();
+        triggerAutoRefresh(false);
     }, 5000);
 
     window.addEventListener('beforeunload', () => {
@@ -1507,7 +1451,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (e.data.type === 'ACULION_SET_BILLBOARD') {
                 if (e.data.billboard_code) {
                     activeBillboardCode = e.data.billboard_code;
-                    fetchFromSupabaseDirectly(activeBillboardCode);
+                    fetchFromSupabaseDirectly(activeBillboardCode, false);
                 }
             }
         }
